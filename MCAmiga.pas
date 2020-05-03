@@ -1,5 +1,8 @@
 program MCAmiga;
 uses
+  {$ifdef AMIGA68k}
+  Exec,
+  {$endif}
   Types, SysUtils, Video, mouse, keyboard, FileListUnit, dialogunit;
 
 procedure Debug(AMsg: string);
@@ -55,46 +58,71 @@ begin
 
   repeat
     Ev := GetKeyEvent;
-
-    case TranslateKeyEvent(Ev) and $ffff of
-      $0F09: begin // TAB
-        SwapSrcDest;
-        Src.IsActive := True;
-        Dest.IsActive := False;
+    try
+      case TranslateKeyEvent(Ev) and $ffff of
+        $0F09: begin // TAB
+          SwapSrcDest;
+          Src.IsActive := True;
+          Dest.IsActive := False;
+        end;
+        $0008: Src.GoToParent;
+        $1C0D, $000D: Src.EnterPressed; // return
+        kbdUp, $38: Src.ActiveElement := Src.ActiveElement - 1; // cursor up
+        kbdDown, $32: Src.ActiveElement := Src.ActiveElement + 1; // cursor down
+        kbdPgUp, $39: Src.ActiveElement := Src.ActiveElement - 10; // pg up
+        kbdPgDn, $33: Src.ActiveElement := Src.ActiveElement + 10; // pg down
+        kbdHome, $37: Src.ActiveElement := 0; // Home
+        kbdEnd, $31: Src.ActiveElement := MaxInt; // end
+        $0023: Src.SelectActiveEntry;
+        $002B: begin
+          Src.SelectByPattern(True); // +
+          Left.Update(False);
+          Right.Update(False);
+        end;
+        $002D: begin
+          Src.SelectByPattern(False); // -
+          Left.Update(False);
+          Right.Update(False);
+        end;
+        kbdF10, $011B: begin // F10, ESC
+          if AskQuestion('Quit Program') then
+            Break;
+          Left.Update(False);
+          Right.Update(False);
+        end;
+        kbdF7: begin
+          Src.MakeDir();
+          Left.Update(False);
+          Right.Update(False);
+        end;
+        kbdF8: begin
+          Src.DeleteSelected();
+          Left.Update(False);
+          Right.Update(False);
+        end
+        else
+          Debug('Key: $' + HexStr(TranslateKeyEvent(Ev), 4));
       end;
-      $0008: Src.GoToParent;
-      $1C0D, $000D: Src.EnterPressed; // return
-      kbdUp, $38: Src.ActiveElement := Src.ActiveElement - 1; // cursor up
-      kbdDown, $32: Src.ActiveElement := Src.ActiveElement + 1; // cursor down
-      kbdPgUp, $39: Src.ActiveElement := Src.ActiveElement - 10; // pg up
-      kbdPgDn, $33: Src.ActiveElement := Src.ActiveElement + 10; // pg down
-      kbdHome, $37: Src.ActiveElement := 0; // Home
-      kbdEnd, $31: Src.ActiveElement := MaxInt; // end
-      kbdF10:begin // F10
-        if AskQuestion('Quit Program') then
-          Break;
-        Left.Update(False);
-        Right.Update(False);
-      end;
-      kbdF7: begin
-        Src.MakeDir();
-        Left.Update(False);
-        Right.Update(False);
-      end;
-      kbdF8: begin
-        Src.DeleteSelected();
-        Left.Update(False);
-        Right.Update(False);
-      end
-      else
-        Debug('Key: $' + HexStr(TranslateKeyEvent(Ev), 4));
+    except
+      Left.Update(False);
+      Right.Update(False);
     end;
   until False; //(ev and $ff00) = $0100;
   Left.Free;
   Right.Free;
 end;
 
+const
+  AFF_68080 = 1 shl 10;
+
 begin
+  {$ifdef AMIGA68k}
+  if (PExecBase(AOS_ExecBase)^.AttnFlags and AFF_68080) <> 0 then
+  begin
+    writeln('Anti-Coffin copy-protection, blocking Vampire');
+    halt(0);
+  end;
+  {$endif}
   InitVideo;
   InitMouse;
   InitKeyboard;

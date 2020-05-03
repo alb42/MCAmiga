@@ -94,7 +94,10 @@ type
     procedure MakeDir(); // F7
     procedure DeleteSelected(); // F8
 
-    procedure SelectFile(AName: string);
+    procedure ActivateFile(AName: string);
+    procedure SelectActiveEntry;
+
+    procedure SelectByPattern(DoSelect: Boolean);
 
     property CurrentPath: string read FCurrentPath write SetCurrentPath;
     property IsActive: Boolean read FIsActive write SetIsActive;
@@ -106,6 +109,7 @@ type
   procedure SetChar(p: Integer; c: Char); overload;
   procedure SetChar(x,y: Integer; c: Char); overload;
   procedure SetText(x,y: Integer; s: string);
+  function LimitName(AName: string; MaxLength: Integer; PathMode: Boolean = False): string;
 
 implementation
 
@@ -238,7 +242,7 @@ end;
 
 { TFileList }
 
-procedure Tfilelist.Setcurrentpath(Avalue: String);
+procedure TFileList.SetCurrentPath(AValue: string);
 begin
   if FCurrentPath = AValue then
     Exit;
@@ -246,16 +250,17 @@ begin
   Update(True);
 end;
 
-procedure Tfilelist.Setactiveelement(Avalue: Integer);
+procedure TFileList.SetActiveElement(AValue: Integer);
 begin
   if FActiveElement = AValue then
     Exit;
   DrawActive(AValue);
 end;
 
-procedure Tfilelist.Drawborder;
+procedure TFileList.DrawBorder;
 var
   i: Integer;
+  s: String;
 begin
   FGPen := LightGray;
   BGPen := Blue;
@@ -282,10 +287,21 @@ begin
       SetChar(FRect.Right, i, VertLine);
     end;
   end;
-  SetText(FRect.Left + 2, FRect.Top, LeftEdge + LimitName(FCurrentPath, FRect.Width - 5, True) + RightEdge);
+  s := LimitName(FCurrentPath, FRect.Width - 5, True);
+  if IsActive then
+  begin
+    SetText(FRect.Left + 2, FRect.Top, LeftEdge);
+    SetText(FRect.Left + 3 + Length(s) , FRect.Top, RightEdge);
+    FGPen := Blue;
+    BGPen := LightGray;
+    SetText(FRect.Left + 3, FRect.Top, s);
+  end
+  else
+    SetText(FRect.Left + 2, FRect.Top, LeftEdge + s + RightEdge);
+
 end;
 
-procedure Tfilelist.Drawcontents(Updatelist: Boolean);
+procedure TFileList.DrawContents(UpdateList: Boolean);
 var
   Info: TSearchRec;
   i: Integer;
@@ -361,20 +377,21 @@ begin
   end;
   for i := 0 to FInnerRect.Height do
   begin
-    DrawEntry(i);
+    DrawEntry(FTopElement + i);
   end;
 end;
 
-procedure Tfilelist.Setisactive(Avalue: Boolean);
+procedure TFileList.SetIsActive(AValue: Boolean);
 begin
   if FIsActive = AValue then Exit;
     FIsActive := AValue;
+  DrawBorder();
   DrawActive(FActiveElement);
   UpdateScreen(False);
 end;
 
 
-procedure Tfilelist.Drawactive(Nactive: Integer);
+procedure TFileList.DrawActive(NActive: Integer);
 var
   OldActive, i, l, n: Integer;
   s: string;
@@ -423,7 +440,7 @@ begin
   UpdateScreen(False);
 end;
 
-procedure Tfilelist.Drawentry(Idx: Integer);
+procedure TFileList.DrawEntry(Idx: Integer);
 var
   s: String;
   l, n: Integer;
@@ -444,6 +461,12 @@ begin
   l := 0;
   if InRange(Idx, 0, FFileList.Count - 1) then
   begin
+    if FFileList[Idx].Selected then
+    begin
+      FGPen := Yellow;
+      col := Yellow;
+    end
+    else
     case FFileList[Idx].EType of
       etFile: col := Green;
       etDir:    col := White;
@@ -487,12 +510,12 @@ begin
     Result := CompareText(Item1.Name, Item2.Name);
 end;
 
-procedure Tfilelist.Sortlist;
+procedure TFileList.SortList;
 begin
   FFileList.Sort(@ListCompare);
 end;
 
-constructor Tfilelist.Create(Arect: Trect);
+constructor TFileList.Create(ARect: TRect);
 begin
   inherited Create;
   FActiveElement := -1;
@@ -505,20 +528,20 @@ begin
   FFileList := TEntryList.Create(True);
 end;
 
-destructor Tfilelist.Destroy;
+destructor TFileList.Destroy;
 begin
   FFileList.Free;
   inherited Destroy;
 end;
 
-procedure Tfilelist.Update(Updatelist: Boolean);
+procedure TFileList.Update(UpdateList: Boolean);
 begin
   DrawBorder();
   DrawContents(UpdateList);
   UpdateScreen(False);
 end;
 
-procedure Tfilelist.Gotoparent;
+procedure TFileList.GoToParent;
 var
   p: SizeInt;
   s, Oldpath: string;
@@ -536,11 +559,11 @@ begin
     p := LastDelimiter(PathDelim + DriveDelim, s);
     OldPath := Copy(s, p + 1, Length(s));
     CurrentPath := Copy(s, 1, p);
-    SelectFile(IncludeTrailingPathDelimiter(OldPath));
+    ActivateFile(IncludeTrailingPathDelimiter(OldPath));
   end;
 end;
 
-procedure Tfilelist.Enterpressed;
+procedure TFileList.EnterPressed;
 var
   s: string;
 begin
@@ -556,12 +579,11 @@ begin
       else
         //
     end;
-    //
-    //
   end;
 end;
 
-procedure Tfilelist.Makedir();
+//############ Make Dir
+procedure TFileList.MakeDir();
 var
   NewName: string;
 begin
@@ -570,14 +592,39 @@ begin
   NewName := 'NewDir';
   if AskForName('Name for the new directory: ', NewName) then
   begin
-    SysUtils.CreateDir(IncludeTrailingPathDelimiter(FCurrentPath) + NewName);
+    if not SysUtils.CreateDir(IncludeTrailingPathDelimiter(FCurrentPath) + NewName) then
+      ShowMessage('Unable to create dir "' + NewName + '"');
     Update(True);
-    SelectFile(IncludeTrailingPathDelimiter(NewName));
+    ActivateFile(IncludeTrailingPathDelimiter(NewName));
   end;
 end;
 
+procedure RecurseDirs(AName: string; FL: TEntryList; var Dirs: Integer; var Files: Integer);
+var
+  Info: TSearchRec;
+  Path: string;
+begin
+  Path := IncludeTrailingPathDelimiter(AName);
+  if FindFirst (Path + '*', faAnyFile and faDirectory, Info) = 0 then
+  begin
+    repeat
+      if (Info.Attr and faDirectory) <> 0 then
+      begin
+        Inc(Dirs);
+        FL.AddDir(Path + Info.Name);
+        RecurseDirs(Path + Info.Name, FL, Dirs, Files);
+      end
+      else
+      begin
+        Inc(Files);
+        FL.AddFile(Path + Info.Name, Info.Size);
+      end;
+    Until FindNext(Info) <> 0;
+    end;
+  FindClose(Info);
+end;
 
-procedure Tfilelist.Dolistofselectedfile(Recursive: Boolean; Fl: Tentrylist; out Dirs: Integer; out Files: Integer);
+procedure TFileList.DoListOfSelectedFile(Recursive: Boolean; FL: TEntryList; out Dirs: integer; out Files: Integer);
 var
   i: Integer;
   Found: Boolean;
@@ -589,7 +636,20 @@ begin
   begin
     if FFileList[i].Selected then
     begin
-      //
+      if FFileList[i].EType = etFile then
+      begin
+        FL.AddFile(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[i].Name, 0);
+        Inc(Files);
+      end;
+      if FFileList[i].EType = etDir then
+      begin
+        FL.AddDir(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[i].Name);
+        Inc(Dirs);
+        if Recursive then
+        begin
+          RecurseDirs(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[i].Name, FL, Dirs, Files);
+        end;
+      end;
       Found := True;
     end;
   end;
@@ -606,31 +666,48 @@ begin
       Inc(Dirs);
       if Recursive then
       begin
-        //
+        RecurseDirs(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name, FL, Dirs, Files);
       end;
     end;
   end;
 end;
 
-procedure Tfilelist.Deleteselected();
+//############ Delete
+procedure TFileList.DeleteSelected();
 var
   FL: TEntryList;
   i, Dirs, Files: Integer;
+  NotDeleted: Integer;
 begin
   FL := TEntryList.Create;
   try
     dirs := 0;
     Files := 0;
+    NotDeleted := 0;
     // make a list of all
     DoListOfSelectedFile(True, FL, dirs, files);
     if FL.Count > 0 then
     begin
       if AskQuestion('Delete ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files?') then
       begin
+        StartProgress('Delete ', FL.Count);
         for i := FL.Count - 1 downto 0 do
         begin
-          DeleteFile(FL[i].Name);
+          try
+            if not UpdateProgress((FL.Count - 1 - i) + 1, 'Delete ' + FL[i].Name) then
+            begin
+              ShowMessage('Delete stopped.');
+              NotDeleted := 0;
+              Break;
+            end;
+            if not DeleteFile(FL[i].Name) then
+              Inc(NotDeleted);
+          except
+            Inc(NotDeleted);
+          end;
         end;
+        if NotDeleted > 0 then
+          ShowMessage('Cannot delete ' + IntToStr(NotDeleted) + ' files/dirs');
         Update(True);
       end;
     end;
@@ -639,21 +716,55 @@ begin
   end;
 end;
 
-procedure Tfilelist.Selectfile(Aname: String);
+procedure TFileList.ActivateFile(AName: string);
 var
   i: LongInt;
 begin
-  writeln('select file ', AName);
   for i := 0 to FFileList.Count - 1 do
   begin
     if LowerCase(AName) = LowerCase(FFileList[i].Name) then
     begin
-      writeln('found');
       ActiveElement := i;
       Break;
     end;
   end;
 end;
+
+procedure TFileList.SelectActiveEntry;
+begin
+  if InRange(FActiveElement, 0, FFileList.Count - 1) then
+  begin
+    FFileList[FActiveElement].Selected := not FFileList[FActiveElement].Selected;
+    DrawEntry(FActiveElement);
+    ActiveElement := FActiveElement + 1;
+  end;
+end;
+
+procedure TFileList.SelectByPattern(DoSelect: Boolean);
+var
+  s, Pattern: string;
+  i: Integer;
+begin
+  if DoSelect then
+    s := 'Pattern to select: '
+  else
+    s := 'Pattern to deselect: ';
+  Pattern := '*';
+  if AskForName(s, Pattern, False) and (Pattern <> '') then
+  begin
+    for i := 0 to FFileList.Count - 1 do
+    begin
+      case FFileList[i].EType of
+        etFile: if IsWild(FFileList[i].Name, Pattern, True) then FFileList[i].Selected := DoSelect;
+        etDir: if IsWild(ExcludeTrailingPathDelimiter(FFileList[i].Name), Pattern, True) then FFileList[i].Selected := DoSelect;
+        else
+
+      end;
+    end;
+  end;
+end;
+
+initialization
 
 end.
 
