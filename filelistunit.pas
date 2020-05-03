@@ -8,7 +8,7 @@ uses
   {$ifdef HASAMIGA}
   AmigaDOS,
   {$endif}
-  Video, Classes, SysUtils, Math, fgl;
+  Video, Classes, SysUtils, Math, fgl, StrUtils;
 
 const
   UpperLeftEdge = #201;
@@ -35,13 +35,29 @@ var
 type
   TEntryType = (etParent, etDir, etFile, etDrive, etAssign);
 
+  { TListEntry }
+
   TListEntry = class
     Name: string;
     EType: TEntryType;
     Size: Integer;
+    Selected: Boolean;
+  public
+    constructor Create; virtual;
+
+    procedure Assign(Src: TListEntry); virtual;
   end;
 
-  TEntryList = specialize TFPGObjectList<TListEntry>;
+  TEntryObjectList = specialize TFPGObjectList<TListEntry>;
+
+  { TEntryList }
+
+  TEntryList = class(TEntryObjectList)
+  public
+    procedure AddFile(AName: string; Size: Int64);
+    procedure AddDir(AName: string);
+    procedure AddCopy(AEntry: TListEntry);
+  end;
 
 
   { TFileList }
@@ -64,13 +80,21 @@ type
     procedure DrawActive(NActive: Integer);
     procedure DrawEntry(Idx: Integer);
 
+    procedure DoListOfSelectedFile(Recursive: Boolean; FL: TEntryList; out Dirs: integer; out Files: Integer);
+
     procedure SortList;
   public
     constructor Create(ARect: TRect); virtual;
     destructor Destroy; override;
 
     procedure Update(UpdateList: Boolean);
+    procedure GoToParent;
     procedure EnterPressed;
+
+    procedure MakeDir(); // F7
+    procedure DeleteSelected(); // F8
+
+    procedure SelectFile(AName: string);
 
     property CurrentPath: string read FCurrentPath write SetCurrentPath;
     property IsActive: Boolean read FIsActive write SetIsActive;
@@ -84,6 +108,9 @@ type
   procedure SetText(x,y: Integer; s: string);
 
 implementation
+
+uses
+  DialogUnit;
 
 function LimitName(AName: string; MaxLength: Integer; PathMode: Boolean = False): string;
 var
@@ -162,9 +189,56 @@ begin
     SetChar(x + i - 1, y, s[i]);
 end;
 
+{ TEntryList }
+
+procedure TEntryList.AddFile(AName: string; Size: Int64);
+var
+  NEntry: TListEntry;
+begin
+  NEntry := TListEntry.Create;
+  NEntry.Name := AName;
+  NEntry.EType := etFile;
+  NEntry.Size := Size;
+  Self.Add(NEntry);
+end;
+
+procedure TEntryList.AddDir(AName: string);
+var
+  NEntry: TListEntry;
+begin
+  NEntry := TListEntry.Create;
+  NEntry.Name := AName;
+  NEntry.EType := etDir;
+  Self.Add(NEntry);
+end;
+
+procedure TEntryList.AddCopy(AEntry: TListEntry);
+var
+  NEntry: TListEntry;
+begin
+  NEntry := TListEntry.Create;
+  NEntry.Assign(AEntry);
+  Self.Add(NEntry);
+end;
+
+{ TListEntry }
+
+constructor TListEntry.Create;
+begin
+  Selected := False;
+end;
+
+procedure TListEntry.Assign(Src: TListEntry);
+begin
+  Self.Name := Src.Name;
+  Self.EType := Src.EType;
+  Self.Selected := False;
+  Self.Size := Src.Size;
+end;
+
 { TFileList }
 
-procedure TFileList.SetCurrentPath(AValue: string);
+procedure Tfilelist.Setcurrentpath(Avalue: String);
 begin
   if FCurrentPath = AValue then
     Exit;
@@ -172,14 +246,14 @@ begin
   Update(True);
 end;
 
-procedure TFileList.SetActiveElement(AValue: Integer);
+procedure Tfilelist.Setactiveelement(Avalue: Integer);
 begin
   if FActiveElement = AValue then
     Exit;
   DrawActive(AValue);
 end;
 
-procedure TFileList.DrawBorder;
+procedure Tfilelist.Drawborder;
 var
   i: Integer;
 begin
@@ -211,7 +285,7 @@ begin
   SetText(FRect.Left + 2, FRect.Top, LeftEdge + LimitName(FCurrentPath, FRect.Width - 5, True) + RightEdge);
 end;
 
-procedure TFileList.DrawContents(UpdateList: Boolean);
+procedure Tfilelist.Drawcontents(Updatelist: Boolean);
 var
   Info: TSearchRec;
   i: Integer;
@@ -291,7 +365,7 @@ begin
   end;
 end;
 
-procedure TFileList.SetIsActive(AValue: Boolean);
+procedure Tfilelist.Setisactive(Avalue: Boolean);
 begin
   if FIsActive = AValue then Exit;
     FIsActive := AValue;
@@ -300,7 +374,7 @@ begin
 end;
 
 
-procedure TFileList.DrawActive(NActive: Integer);
+procedure Tfilelist.Drawactive(Nactive: Integer);
 var
   OldActive, i, l, n: Integer;
   s: string;
@@ -349,7 +423,7 @@ begin
   UpdateScreen(False);
 end;
 
-procedure TFileList.DrawEntry(Idx: Integer);
+procedure Tfilelist.Drawentry(Idx: Integer);
 var
   s: String;
   l, n: Integer;
@@ -413,12 +487,12 @@ begin
     Result := CompareText(Item1.Name, Item2.Name);
 end;
 
-procedure TFileList.SortList;
+procedure Tfilelist.Sortlist;
 begin
   FFileList.Sort(@ListCompare);
 end;
 
-constructor TFileList.Create(ARect: TRect);
+constructor Tfilelist.Create(Arect: Trect);
 begin
   inherited Create;
   FActiveElement := -1;
@@ -431,22 +505,43 @@ begin
   FFileList := TEntryList.Create(True);
 end;
 
-destructor TFileList.Destroy;
+destructor Tfilelist.Destroy;
 begin
   FFileList.Free;
   inherited Destroy;
 end;
 
-procedure TFileList.Update(UpdateList: Boolean);
+procedure Tfilelist.Update(Updatelist: Boolean);
 begin
   DrawBorder();
   DrawContents(UpdateList);
   UpdateScreen(False);
 end;
 
-procedure TFileList.EnterPressed;
+procedure Tfilelist.Gotoparent;
 var
   p: SizeInt;
+  s, Oldpath: string;
+begin
+  s := CurrentPath;
+  p := Length(s);
+  if p = 0 then
+    Exit;
+  if s[p] = DriveDelim then
+  begin
+    CurrentPath := '';
+  end
+  else
+  begin
+    p := LastDelimiter(PathDelim + DriveDelim, s);
+    OldPath := Copy(s, p + 1, Length(s));
+    CurrentPath := Copy(s, 1, p);
+    SelectFile(IncludeTrailingPathDelimiter(OldPath));
+  end;
+end;
+
+procedure Tfilelist.Enterpressed;
+var
   s: string;
 begin
   //
@@ -457,25 +552,106 @@ begin
       etDir: CurrentPath := IncludeTrailingPathDelimiter(s) + FFileList[FActiveElement].Name;
       etDrive,
       etAssign: CurrentPath := FFileList[FActiveElement].Name;
-      etParent: begin
-        p := Length(s);
-        if p = 0 then
-          Exit;
-        if s[p] = DriveDelim then
-        begin
-          CurrentPath := '';
-        end
-        else
-        begin
-          p := LastDelimiter(PathDelim + DriveDelim, s);
-          CurrentPath := Copy(s, 1, p);
-        end;
-      end;
+      etParent: GoToParent;
       else
         //
     end;
     //
     //
+  end;
+end;
+
+procedure Tfilelist.Makedir();
+var
+  NewName: string;
+begin
+  if FCurrentPath = '' then
+    Exit;
+  NewName := 'NewDir';
+  if AskForName('Name for the new directory: ', NewName) then
+  begin
+    SysUtils.CreateDir(IncludeTrailingPathDelimiter(FCurrentPath) + NewName);
+    Update(True);
+    SelectFile(IncludeTrailingPathDelimiter(NewName));
+  end;
+end;
+
+
+procedure Tfilelist.Dolistofselectedfile(Recursive: Boolean; Fl: Tentrylist; out Dirs: Integer; out Files: Integer);
+var
+  i: Integer;
+  Found: Boolean;
+begin
+  dirs := 0;
+  Files := 0;
+  Found := False;
+  for i := 0 to FFileList.Count - 1 do
+  begin
+    if FFileList[i].Selected then
+    begin
+      //
+      Found := True;
+    end;
+  end;
+  if (not Found) and inRange(FActiveElement, 1, FFileList.Count - 1) then
+  begin
+    if FFileList[FActiveElement].EType = etFile then
+    begin
+      FL.AddFile(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name, 0);
+      Inc(Files);
+    end;
+    if FFileList[FActiveElement].EType = etDir then
+    begin
+      FL.AddDir(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name);
+      Inc(Dirs);
+      if Recursive then
+      begin
+        //
+      end;
+    end;
+  end;
+end;
+
+procedure Tfilelist.Deleteselected();
+var
+  FL: TEntryList;
+  i, Dirs, Files: Integer;
+begin
+  FL := TEntryList.Create;
+  try
+    dirs := 0;
+    Files := 0;
+    // make a list of all
+    DoListOfSelectedFile(True, FL, dirs, files);
+    if FL.Count > 0 then
+    begin
+      if AskQuestion('Delete ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files?') then
+      begin
+        for i := FL.Count - 1 downto 0 do
+        begin
+          DeleteFile(FL[i].Name);
+        end;
+        Update(True);
+      end;
+    end;
+  finally
+    FL.Free;
+  end;
+end;
+
+procedure Tfilelist.Selectfile(Aname: String);
+var
+  i: LongInt;
+begin
+  writeln('select file ', AName);
+  for i := 0 to FFileList.Count - 1 do
+  begin
+    if LowerCase(AName) = LowerCase(FFileList[i].Name) then
+    begin
+      writeln('found');
+      ActiveElement := i;
+      Break;
+    end;
   end;
 end;
 

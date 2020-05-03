@@ -62,6 +62,7 @@ begin
         Src.IsActive := True;
         Dest.IsActive := False;
       end;
+      $0008: Src.GoToParent;
       $1C0D, $000D: Src.EnterPressed; // return
       kbdUp, $38: Src.ActiveElement := Src.ActiveElement - 1; // cursor up
       kbdDown, $32: Src.ActiveElement := Src.ActiveElement + 1; // cursor down
@@ -72,6 +73,16 @@ begin
       kbdF10:begin // F10
         if AskQuestion('Quit Program') then
           Break;
+        Left.Update(False);
+        Right.Update(False);
+      end;
+      kbdF7: begin
+        Src.MakeDir();
+        Left.Update(False);
+        Right.Update(False);
+      end;
+      kbdF8: begin
+        Src.DeleteSelected();
         Left.Update(False);
         Right.Update(False);
       end
