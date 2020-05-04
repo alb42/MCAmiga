@@ -32,7 +32,6 @@ var
   Left, Right: TFileList;
   Ev: TKeyEvent;
 begin
-  ClearScreen;
   LeftSide := Rect(0, 0, (ScreenWidth div 2) - 1, ScreenHeight - 1);
   RightSide := Rect(LeftSide.Right + 1, 0, ScreenWidth - 1, ScreenHeight - 1);
 
@@ -65,41 +64,54 @@ begin
           Src.IsActive := True;
           Dest.IsActive := False;
         end;
-        $0008: Src.GoToParent;
-        $1C0D, $000D: Src.EnterPressed; // return
-        kbdUp, $38: Src.ActiveElement := Src.ActiveElement - 1; // cursor up
-        kbdDown, $32: Src.ActiveElement := Src.ActiveElement + 1; // cursor down
+        $0008: Src.GoToParent;                                     // Backspace
+        $1C0D, $000D: Src.EnterPressed;                            // return
+        kbdUp, $38: Src.ActiveElement := Src.ActiveElement - 1;    // cursor up
+        kbdDown, $32: Src.ActiveElement := Src.ActiveElement + 1;  // cursor down
         kbdPgUp, $39: Src.ActiveElement := Src.ActiveElement - 10; // pg up
         kbdPgDn, $33: Src.ActiveElement := Src.ActiveElement + 10; // pg down
         kbdHome, $37: Src.ActiveElement := 0; // Home
         kbdEnd, $31: Src.ActiveElement := MaxInt; // end
-        $0023: Src.SelectActiveEntry;
+        $1312, $1300: Src.Update(True);                    // Ctrl + R Alt + R
+        $180F, $1800: Dest.CurrentPath := Src.CurrentPath; // Ctrl + O   Alt + O
+        $2004, $2000: Src.CurrentPath := '';               // Ctrl + D Alt + D
+        kbdInsert, $0023, $0030: Src.SelectActiveEntry;    // Insert, #, 0
         $002B: begin
-          Src.SelectByPattern(True); // +
+          Src.SelectByPattern(True);                       // +
           Left.Update(False);
           Right.Update(False);
         end;
         $002D: begin
-          Src.SelectByPattern(False); // -
+          Src.SelectByPattern(False);                      // -
           Left.Update(False);
           Right.Update(False);
         end;
-        kbdF10, $011B: begin // F10, ESC
+        kbdF10, $011B: begin                               // F10, ESC
           if AskQuestion('Quit Program') then
             Break;
           Left.Update(False);
           Right.Update(False);
+        end;
+        kbdF5: begin
+          Src.CopyFiles(Dest.CurrentPath);
+          Src.Update(False);
+          Dest.Update(True);
         end;
         kbdF7: begin
           Src.MakeDir();
           Left.Update(False);
           Right.Update(False);
         end;
-        kbdF8: begin
+        kbdF8, kbdDelete: begin                           // Delete
           Src.DeleteSelected();
           Left.Update(False);
           Right.Update(False);
-        end
+        end;
+        kbdF1: begin
+          ShowHelp;
+          Left.Update(False);
+          Right.Update(False);
+        end;
         else
           Debug('Key: $' + HexStr(TranslateKeyEvent(Ev), 4));
       end;
@@ -126,6 +138,9 @@ begin
   InitVideo;
   InitMouse;
   InitKeyboard;
+  {$ifdef HASAMIGA}
+  Video.SetWindowTitle('MyCommander Amiga 0.1', 'My Commander Amiga');
+  {$endif}
 
   StartMe;
 
