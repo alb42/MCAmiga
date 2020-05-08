@@ -5,7 +5,7 @@ unit dialogunit;
 interface
 
 uses
-  Classes, SysUtils, Video, Keyboard, Mouse, Math;
+  Classes, SysUtils, Video, Keyboard, Mouse, Math, EventUnit;
 
 const
   URCorner = #191;
@@ -22,30 +22,104 @@ const
   ProgressHalf = #221;
   ProgressFull = #219;
 
-function AskQuestion(Text: string): Boolean; // yes = true
-function AskForName(Text: string; var NewName: string; AsName: Boolean = True): Boolean;
+type
 
-procedure ShowMessage(Text: string);
+  { TBaseDialog }
 
-procedure StartProgress(Text: string; AMaxNum: LongInt);
-function UpdateProgress(Num: LongInt; Text: string = ''): Boolean;
+  TBaseDialog = class
+  protected
+    Mid: TPoint;
+    WindowRect: TRect;
+    InnerRect: TRect;
+  protected
+    function PollNextKey: TKeyEvent; virtual;
+    procedure DrawButtons; virtual; abstract;
+    procedure DrawWindowBorder; virtual;
+    procedure Paint; virtual; // Draw the window
+  public
+    function Execute: Integer; virtual; abstract; // returns the number of the Button pressed
+  end;
 
-procedure StartProgress2(Text: string; AMaxNumUpper, AMaxNumLower: LongInt);
-function UpdateProgress2(Num1, Num2: LongInt; Text1: string = ''; Text2: string = ''): Boolean;
+  { TShowMessage }
+
+  TShowMessage = class(TBaseDialog)
+  protected
+    procedure DrawButtons; override;
+    procedure Paint; override; // Draw the window
+  public
+    Text: string; // set before Execute!
+    function Execute: Integer; override; // returns the number of the Button pressed
+  end;
+
+  { TAskQuestion }
+
+  TAskQuestion = class(TShowMessage)
+  protected
+    YesActive: Boolean;
+    procedure DrawButtons; override;
+  public
+    function Execute: Integer; override; // returns the number of the Button pressed
+  end;
+
+  { TAskForName }
+
+  TAskForName = class(TAskQuestion)
+  private
+     TxtL, TxtR: LongInt;
+  protected
+    procedure Paint; override; // Draw the window
+  public
+    NewName: string;
+    AsName: Boolean;
+    function Execute: Integer; override; // returns the number of the Button pressed
+  end;
+
+  { TSingleProgress }
+
+  TSingleProgress = class(TBaseDialog)
+  protected
+    LastCall: LongWord;
+    CurValue: LongWord;
+    Pup: LongInt;
+    PGL: LongInt;
+    PGR: LongInt;
+  protected
+    procedure DrawButtons; override;
+    procedure Paint; override;
+  public
+    MaxValue: LongWord;
+    Text: string;
+    function Execute: Integer; override;
+    function UpdateValue(AValue: LongWord; NText: string = ''): Boolean; virtual;
+  end;
+
+  { TDoubleProgress }
+
+  TDoubleProgress = class(TSingleProgress)
+  protected
+    CurValue2: LongWord;
+    procedure Paint; override;
+  public
+    MaxValue2: LongWord;
+    Text2: string;
+    function Execute: Integer; override;
+    function UpdateValue(AValue: LongWord; NText: string = ''): Boolean; override;
+    function UpdateValue2(AValue1: LongWord; NText1: string = ''; AValue2: LongWord = 0; NText2: string = ''): Boolean;
+  end;
+
+
+
+
+function AskQuestion(AText: string): Boolean; // yes = true
+function AskForName(AText: string; var ANewName: string; UseAsName: Boolean = True): Boolean;
 
 procedure ShowHelp;
+procedure ShowMessage(AText: string);
 
 implementation
 
 uses
   FileListUnit;
-
-var
-  Pup: LongInt;
-  PGL: LongInt;
-  PGR: LongInt;
-  MaxNum: LongInt;
-  MaxNum2: LongInt;
 
 const       //.........1.........2.........3.........4.........5........6.........7
   HelpText = '        MyCommander Amiga Version 0.1       '#13#10 +
@@ -65,422 +139,110 @@ const       //.........1.........2.........3.........4.........5........6.......
 
 
 procedure ShowHelp;
-var
-  Mid: TPoint;
-  Wind: TRect;
-  x, y, i: Integer;
-  Key: TKeyEvent;
-  SL: TStringList;
-
-  procedure DrawButtons;
-  begin
-    BGPen := Cyan;
-    SetText(Mid.x - 1, Wind.Bottom + 1, LBorder + 'OK' + RBorder);
-    BGPen := LightGray;
-  end;
-
 begin
-  mid.x := ScreenWidth div 2;
-  mid.y := ScreenHeight div 2;
-
-  Wind.Left := 3;
-  Wind.Top := 3;
-  Wind.Bottom := ScreenHeight - 3;
-  Wind.Right :=  ScreenWidth - 3;
-  BGPen := LightGray;
-  FGPen := Black;
-  for y := Wind.Top to Wind.Bottom do
+  with TShowMessage.Create do
   begin
-    for x := Wind.Left to Wind.Right do
-    begin
-      if (y = Wind.Top) or (y = Wind.Bottom) then
-        SetChar(x,y, HLine)
-      else
-      begin
-        if (x = Wind.Left) or (x = Wind.Right) then
-          SetChar(x,y, VLine)
-        else
-          SetChar(x,y, ' ');
-      end;
-    end;
+    Text := HelpText;
+    Execute;
+    Free;
   end;
-  SetChar(Wind.Left, Wind.Top, ULCorner);
-  SetChar(Wind.Left, Wind.Bottom, LLCorner);
-  SetChar(Wind.Right, Wind.Bottom, LRCorner);
-  SetChar(Wind.Right, Wind.Top, URCorner);
+end;
 
-  Wind.Inflate(-1,-1);
+procedure ShowMessage(AText: string);
+begin
+  with TShowMessage.Create do
+  begin
+    Text := AText;
+    Execute;
+    Free;
+  end;
+end;
 
-  SL := TStringList.Create;
-  SL.Text := HelpText;
-
-  for i := 0 to SL.Count - 1 do
-    SetText(Wind.left, Wind.Top + i, SL[i]);
-
-  // draw Buttons
-  DrawButtons;
-  UpdateScreen(False);
-  repeat
-    Key := GetKeyEvent;
-    case (Key and $FFFF) of
-      $1C0D: Break;
-    end;
-  until (Key and $ff00) = $0100;
+function AskQuestion(AText: string): Boolean;
+begin
+  with TAskQuestion.Create do
+  begin
+    Text := AText;
+    Result := Execute = 0;
+    Free;
+  end;
 end;
 
 
-function AskQuestion(Text: string): Boolean;
-var
-  Mid: TPoint;
-  Wind: TRect;
-  x, y: Integer;
-  Key: TKeyEvent;
-  YesActive: Boolean;
-
-  procedure DrawButtons;
-  begin
-    if YesActive then
-      BGPen := Cyan
-    else
-      BGPen := LightGray;
-    SetText(Mid.x - 6, Wind.Bottom, LBorder + 'Yes' + RBorder);
-    if not YesActive then
-      BGPen := Cyan
-    else
-      BGPen := LightGray;
-    SetText(Mid.x + 2, Wind.Bottom, LBorder + 'No ' + RBorder);
-    BGPen := LightGray;
-  end;
-
+function AskForName(AText: String; var ANewname: String; UseAsName: Boolean = True): Boolean;
 begin
-  Result := False;
-  YesActive := True;
-  mid.x := ScreenWidth div 2;
-  mid.y := ScreenHeight div 2;
-
-  Wind.Left := Max(2, mid.x - 20);
-  Wind.Top := Max(2, mid.y - 2);
-  Wind.Bottom := Min(ScreenHeight - 3, mid.y + 2);
-  Wind.Right :=  Min(ScreenWidth - 3, mid.x + 20);
-  BGPen := LightGray;
-  FGPen := Black;
-  for y := Wind.Top to Wind.Bottom do
+  with TAskForName.Create do
   begin
-    for x := Wind.Left to Wind.Right do
-    begin
-      if (y = Wind.Top) or (y = Wind.Bottom) then
-        SetChar(x,y, HLine)
-      else
-      begin
-        if (x = Wind.Left) or (x = Wind.Right) then
-          SetChar(x,y, VLine)
-        else
-          SetChar(x,y, ' ');
-      end;
-    end;
+    Text := AText;
+    NewName := ANewName;
+    AsName := UseAsName;
+    Result := Execute = 0;
+    if Result then
+      ANewName := NewName;
+    Free;
   end;
-  SetChar(Wind.Left, Wind.Top, ULCorner);
-  SetChar(Wind.Left, Wind.Bottom, LLCorner);
-  SetChar(Wind.Right, Wind.Bottom, LRCorner);
-  SetChar(Wind.Right, Wind.Top, URCorner);
-
-  SetText(Mid.X - Length(Text) div 2, Mid.Y, Text);
-
-  // draw Buttons
-  DrawButtons;
-  UpdateScreen(False);
-  repeat
-    Key := GetKeyEvent;
-    case (Key and $FFFF) of
-      $4B00, $34: begin // cursor left
-        if not YesActive then
-        begin
-          YesActive := True;
-          DrawButtons;
-          UpdateScreen(False);
-        end;
-      end;
-      $4D00, $36: begin // cursor right
-        if YesActive then
-        begin
-          YesActive := False;
-          DrawButtons;
-          UpdateScreen(False);
-        end;
-      end;
-      $1C0D: begin
-        Result := YesActive;
-        Break;
-      end;
-    end;
-  until (Key and $ff00) = $0100;
 end;
 
-function AskForName(Text: String; var Newname: String; AsName: Boolean = True): Boolean;
+{ TDoubleProgress }
+
+procedure TDoubleProgress.Paint;
 var
-  Mid: TPoint;
-  Wind: TRect;
-  x, y: Integer;
-  Key: TKeyEvent;
-  YesActive: Boolean;
-  Txtl, Txtr: Longint;
-  C: Char;
-
-  procedure DrawButtons;
-  begin
-    FGPen := Black;
-    if YesActive then
-      BGPen := Cyan
-    else
-      BGPen := LightGray;
-    SetText(Mid.x - 7, Wind.Bottom, LBorder + 'Ok' + RBorder);
-    if not YesActive then
-      BGPen := Cyan
-    else
-      BGPen := LightGray;
-    SetText(Mid.x + 2, Wind.Bottom, LBorder + 'Cancel' + RBorder);
-    BGPen := LightGray;
-  end;
-
+  x: Integer;
 begin
-  Result := False;
-  YesActive := True;
   mid.x := ScreenWidth div 2;
   mid.y := ScreenHeight div 2;
-
-  Wind.Left := Max(2, mid.x - 20);
-  Wind.Top := Max(2, mid.y - 2);
-  Wind.Bottom := Min(ScreenHeight - 3, mid.y + 2);
-  Wind.Right :=  Min(ScreenWidth - 3, mid.x + 20);
+  //
+  WindowRect.Left := Max(2, mid.x - 40);
+  WindowRect.Top := Max(2, mid.y - 3);
+  WindowRect.Bottom := Min(ScreenHeight - 3, mid.y + 3);
+  WindowRect.Right :=  Min(ScreenWidth - 3, mid.x + 40);
   BGPen := LightGray;
   FGPen := Black;
-  for y := Wind.Top to Wind.Bottom do
-  begin
-    for x := Wind.Left to Wind.Right do
-    begin
-      if (y = Wind.Top) or (y = Wind.Bottom) then
-        SetChar(x,y, HLine)
-      else
-      begin
-        if (x = Wind.Left) or (x = Wind.Right) then
-          SetChar(x,y, VLine)
-        else
-          SetChar(x,y, ' ');
-      end;
-    end;
-  end;
-  SetChar(Wind.Left, Wind.Top, ULCorner);
-  SetChar(Wind.Left, Wind.Bottom, LLCorner);
-  SetChar(Wind.Right, Wind.Bottom, LRCorner);
-  SetChar(Wind.Right, Wind.Top, URCorner);
+  DrawWindowBorder;
 
   SetText(Mid.X - Length(Text) div 2, Mid.Y - 1, Text);
 
-  TxtL := Wind.Left + 2;
-  TxtR := Wind.Right - 2;
-
-  BGPen := Black;
-  FGPen := LightGray;
-  for x := TxtL to TxtR do
-  begin
-    SetChar(x, Mid.y, ' ');
-  end;
-
-  SetCursorType(crUnderline);
-  SetCursorPos(TxtL + Length(NewName), Mid.Y);
-  SetText(TxtL, Mid.y, Newname);
-
-  // draw Buttons
-  DrawButtons;
-  UpdateScreen(False);
-  repeat
-    Key := GetKeyEvent;
-    case (Key and $FFFF) of
-      $4B00: begin // cursor left
-        if not YesActive then
-        begin
-          YesActive := True;
-          DrawButtons;
-          UpdateScreen(False);
-        end;
-      end;
-      $4D00: begin // cursor right
-        if YesActive then
-        begin
-          YesActive := False;
-          DrawButtons;
-          UpdateScreen(False);
-        end;
-      end;
-      $1C0D: begin
-        Result := YesActive;
-        Break;
-      end;
-      else
-      begin
-        c := GetKEyEventChar(Key);
-        case c of
-          'a'..'z','A'..'Z','-','.','_','0'..'9','*': begin
-            if (not AsName) or (c <> '*') then
-            begin
-              if Length(NewName) < 30 then
-                NewName := NewName + c;
-              BGPen := Black;
-              FGPen := LightGray;
-              SetCursorPos(TxtL + Length(NewName), Mid.Y);
-              SetText(TxtL, Mid.y, Newname);
-              UpdateScreen(False);
-            end;
-          end;
-          #8: begin
-            if Length(NewName) > 0 then
-              NewName := Copy(NewName, 1, Length(NewName) - 1);
-            BGPen := Black;
-            FGPen := LightGray;
-            SetChar(TxtL + Length(NewName), Mid.y, ' ');
-            SetCursorPos(TxtL + Length(NewName), Mid.Y);
-            UpdateScreen(False);
-          end;
-        end
-      end;
-    end;
-  until (Key and $ff00) = $0100;
-  SetCursorType(crHidden);
-end;
-
-procedure ShowMessage(Text: string);
-var
-  Mid: TPoint;
-  Wind: TRect;
-  x, y: Integer;
-  Key: TKeyEvent;
-
-  procedure DrawButtons;
-  begin
-    BGPen := Cyan;
-    SetText(Mid.x - 1, Wind.Bottom, LBorder + 'OK' + RBorder);
-    BGPen := LightGray;
-  end;
-
-begin
-  mid.x := ScreenWidth div 2;
-  mid.y := ScreenHeight div 2;
-
-  Wind.Left := Max(2, mid.x - 20);
-  Wind.Top := Max(2, mid.y - 2);
-  Wind.Bottom := Min(ScreenHeight - 3, mid.y + 2);
-  Wind.Right :=  Min(ScreenWidth - 3, mid.x + 20);
-  BGPen := LightGray;
-  FGPen := Black;
-  for y := Wind.Top to Wind.Bottom do
-  begin
-    for x := Wind.Left to Wind.Right do
-    begin
-      if (y = Wind.Top) or (y = Wind.Bottom) then
-        SetChar(x,y, HLine)
-      else
-      begin
-        if (x = Wind.Left) or (x = Wind.Right) then
-          SetChar(x,y, VLine)
-        else
-          SetChar(x,y, ' ');
-      end;
-    end;
-  end;
-  SetChar(Wind.Left, Wind.Top, ULCorner);
-  SetChar(Wind.Left, Wind.Bottom, LLCorner);
-  SetChar(Wind.Right, Wind.Bottom, LRCorner);
-  SetChar(Wind.Right, Wind.Top, URCorner);
-
-  SetText(Mid.X - Length(Text) div 2, Mid.Y, Text);
-
-  // draw Buttons
-  DrawButtons;
-  UpdateScreen(False);
-  repeat
-    Key := GetKeyEvent;
-    case (Key and $FFFF) of
-      $1C0D: Break;
-    end;
-  until (Key and $ff00) = $0100;
-end;
-
-var
-  LastCall: LongWord = 0;
-
-procedure StartProgress(Text: string; AMaxNum: LongInt);
-var
-  Mid: TPoint;
-  Wind: TRect;
-  x, y: Integer;
-
-  procedure DrawButtons;
-  begin
-    BGPen := Cyan;
-    SetText(Mid.x - 3, Wind.Bottom, LBorder + 'Cancel' + RBorder);
-    BGPen := LightGray;
-  end;
-
-begin
-  mid.x := ScreenWidth div 2;
-  mid.y := ScreenHeight div 2;
-
-  Wind.Left := Max(2, mid.x - 40);
-  Wind.Top := Max(2, mid.y - 2);
-  Wind.Bottom := Min(ScreenHeight - 3, mid.y + 2);
-  Wind.Right :=  Min(ScreenWidth - 3, mid.x + 40);
-  BGPen := LightGray;
-  FGPen := Black;
-  for y := Wind.Top to Wind.Bottom do
-  begin
-    for x := Wind.Left to Wind.Right do
-    begin
-      if (y = Wind.Top) or (y = Wind.Bottom) then
-        SetChar(x,y, HLine)
-      else
-      begin
-        if (x = Wind.Left) or (x = Wind.Right) then
-          SetChar(x,y, VLine)
-        else
-          SetChar(x,y, ' ');
-      end;
-    end;
-  end;
-  SetChar(Wind.Left, Wind.Top, ULCorner);
-  SetChar(Wind.Left, Wind.Bottom, LLCorner);
-  SetChar(Wind.Right, Wind.Bottom, LRCorner);
-  SetChar(Wind.Right, Wind.Top, URCorner);
-
-  SetText(Mid.X - Length(Text) div 2, Mid.Y - 1, Text);
-
-  PGL := Wind.Left + 2;
-  PGR := Wind.Right - 2;
+  PGL := WindowRect.Left + 2;
+  PGR := WindowRect.Right - 2;
   Pup := Mid.y;
 
   BGPen := LightGray;
   FGPen := Black;
   for x := PGL to PGR do
   begin
-    SetChar(x, Mid.y, ProgressEmpty);
+    SetChar(x, Pup - 1, ProgressEmpty);
+    SetChar(x, Pup + 1, ProgressEmpty);
   end;
-  MaxNum := AMaxNum;
-  if MaxNum <= 0 then
-    MaxNum := 1;
-
+  if MaxValue <= 0 then
+    MaxValue := 1;
+  if MaxValue2 <= 0 then
+    MaxValue2 := 1;
   // draw Buttons
   DrawButtons;
   UpdateScreen(False);
-  {$WARNINGS OFF}
-  LastCall := GetTickCount;
-  {$WARNINGS ON}
 end;
 
-function UpdateProgress(Num: LongInt; Text: string = ''): Boolean;
-var
-  w,P,x: LongInt;
-  Key: TKeyEvent;
-  t1: Int64;
+function TDoubleProgress.Execute: Integer;
 begin
+  Result := inherited Execute;
+end;
+
+function TDoubleProgress.UpdateValue(AValue: LongWord; NText: string): Boolean;
+begin
+  Result := UpdateValue2(AValue, NText, CurValue, Text2);
+end;
+
+function TDoubleProgress.UpdateValue2(AValue1: LongWord; NText1: string; AValue2: LongWord; NText2: string): Boolean;
+var
+  w,p,x: LongInt;
+  t1: LongWord;
+  Key: TKeyEvent;
+begin
+  CurValue := AValue1;
+  Text := NText1;
+  CurValue2 := AValue2;
+  Text2 := NText2;
+
   Result := True;
   {$WARNINGS OFF}
   t1 := GetTickCount;
@@ -491,7 +253,120 @@ begin
     BGPen := LightGray;
     FGPen := Black;
     w := PGR - PGL;
-    p := Round(Num/MaxNum * w);
+    p := Round(CurValue/MaxValue * w);
+    //writeln('num1: ', num1 , ' maxNum ', MaxNum,' w ', w, ' p ', P, ' PGL ', PGL, ' PGR ', PGR );
+    for x := PGL to PGL + P do
+    begin
+      SetChar(x, Pup - 1, ProgressFull);
+    end;
+    p := Round(CurValue2/MaxValue2 * w);
+    for x := PGL to PGL + P do
+    begin
+      SetChar(x, Pup + 1, ProgressFull);
+    end;
+    if Text <> '' then
+    begin
+      for x := PGL to PGR do
+      begin
+        SetChar(x, Pup - 2, ' ');
+      end;
+      Text := LimitName(Text, w - 10, False);
+      p := w div 2 - Length(Text) div 2 + 5;
+      SetText(p, Pup - 2, Text);
+    end;
+    if Text2 <> '' then
+    begin
+      for x := PGL to PGR do
+      begin
+        SetChar(x, Pup, ' ');
+      end;
+      Text2 := LimitName(Text2, w - 10, False);
+      p := (PGR - 2) - Length(Text2);
+      SetText(p, Pup, Text2);
+    end;
+    UpdateScreen(False);
+  end;
+  Key := PollNextKey;
+  // Break on Enter -> Cancel
+  if (Key and $FFFF) = $1C0D then
+    Result := False;
+
+end;
+
+{ TSingleProgress }
+
+procedure TSingleProgress.DrawButtons;
+begin
+  BGPen := Cyan;
+  FGPen := Black;
+  SetText(Mid.x - 4, WindowRect.Bottom, LBorder + 'Cancel' + RBorder);
+  BGPen := LightGray;
+end;
+
+procedure TSingleProgress.Paint;
+var
+  x: LongInt;
+begin
+  inherited;
+  WindowRect.Left := Max(2, mid.x - 40);
+  WindowRect.Top := Max(2, mid.y - 2);
+  WindowRect.Bottom := Min(ScreenHeight - 3, mid.y + 2);
+  WindowRect.Right :=  Min(ScreenWidth - 3, mid.x + 40);
+  BGPen := LightGray;
+  FGPen := Black;
+  DrawWindowBorder;
+
+  SetText(Mid.X - Length(Text) div 2, Mid.Y - 1, Text);
+
+  PGL := WindowRect.Left + 2;
+  PGR := WindowRect.Right - 2;
+  Pup := Mid.y;
+
+  BGPen := LightGray;
+  FGPen := Black;
+  for x := PGL to PGR do
+  begin
+    SetChar(x, Mid.y, ProgressEmpty);
+  end;
+
+  // draw Buttons
+  DrawButtons;
+  UpdateScreen(False);
+end;
+
+function TSingleProgress.Execute: Integer;
+begin
+  Result := 1;
+  {$WARNINGS OFF}
+  LastCall := GetTickCount;
+  {$WARNINGS ON}
+  CurValue := 0;
+  if MaxValue = 0 then
+    MaxValue := 1;
+
+  Paint;
+end;
+
+function TSingleProgress.UpdateValue(AValue: LongWord; NText: string = ''): boolean;
+var
+  x, w, p: LongInt;
+  t1: LongWord;
+  Key: TKeyEvent;
+begin
+  CurValue := AValue;
+  if NText <> '' then
+    Text := NText;
+  Result := True;
+  {$WARNINGS OFF}
+  t1 := GetTickCount;
+  {$WARNINGS ON}
+  if t1 - LastCall > 100 then
+  begin
+    LastCall := t1;
+    BGPen := LightGray;
+    FGPen := Black;
+    w := PGR - PGL;
+    p := Round(CurValue/MaxValue * w);
     for x := PGL to P do
     begin
       SetChar(x, Pup, ProgressFull);
@@ -508,136 +383,310 @@ begin
     end;
     UpdateScreen(False);
   end;
-  Key := PollKeyEvent;
+  Key := PollNextKey;
   // Break on Enter -> Cancel
   if (Key and $FFFF) = $1C0D then
     Result := False;
 end;
 
-procedure StartProgress2(Text: string; AMaxNumUpper, AMaxNumLower: LongInt);
+{ TAskForName }
+
+procedure TAskForName.Paint;
 var
-  Mid: TPoint;
-  Wind: TRect;
-  x, y: Integer;
-
-  procedure DrawButtons;
-  begin
-    BGPen := Cyan;
-    SetText(Mid.x - 3, Wind.Bottom, LBorder + 'Cancel' + RBorder);
-    BGPen := LightGray;
-  end;
-
+  x: LongInt;
 begin
-  mid.x := ScreenWidth div 2;
-  mid.y := ScreenHeight div 2;
-
-  Wind.Left := Max(2, mid.x - 40);
-  Wind.Top := Max(2, mid.y - 3);
-  Wind.Bottom := Min(ScreenHeight - 3, mid.y + 3);
-  Wind.Right :=  Min(ScreenWidth - 3, mid.x + 40);
+  inherited;
+  WindowRect.Left := Max(2, mid.x - 20);
+  WindowRect.Top := Max(2, mid.y - 2);
+  WindowRect.Bottom := Min(ScreenHeight - 3, mid.y + 2);
+  WindowRect.Right :=  Min(ScreenWidth - 3, mid.x + 20);
   BGPen := LightGray;
   FGPen := Black;
-  for y := Wind.Top to Wind.Bottom do
+  DrawWindowBorder;
+
+  SetText(Mid.X - Length(Text) div 2, Mid.Y - 1, Text);
+
+  TxtL := WindowRect.Left + 2;
+  TxtR := WindowRect.Right - 2;
+
+  BGPen := Black;
+  FGPen := LightGray;
+  for x := TxtL to TxtR do
   begin
-    for x := Wind.Left to Wind.Right do
+    SetChar(x, Mid.y, ' ');
+  end;
+
+  SetCursorType(crUnderline);
+  SetCursorPos(TxtL + Length(NewName), Mid.Y);
+  SetText(TxtL, Mid.y, Newname);
+
+  // draw Buttons
+  FGPen := Black;
+  BGPen := LightGray;
+  DrawButtons;
+  UpdateScreen(False);
+end;
+
+function TAskForName.Execute: Integer;
+var
+  Key: TKeyEvent;
+  c: Char;
+  p: LongInt;
+begin
+  YesActive := True;
+  Paint;
+  repeat
+    Key := PollNextKey;
+    case (Key and $FFFF) of
+      $4B00: begin // cursor left
+        if CursorX > TxtL then
+          SetCursorPos(CursorX - 1, CursorY);
+      end;
+      $4D00: begin // cursor right
+        if CursorX < TxtL + Length(NewName) then
+          SetCursorPos(CursorX + 1, CursorY);
+      end;
+      $1C0D: begin
+        Result := ifthen(YesActive, 0, 1);
+        Break;
+      end;
+      $011B: begin
+        Result := 1;
+        Exit;
+      end;
+      $0F09: begin
+        YesActive := not YesActive;
+        FGPen := Black;
+        BGPen := LightGray;
+        DrawButtons;
+        UpdateScreen(False);
+      end
+      else
+      begin
+        c := GetKeyEventChar(Key);
+        case c of
+          'a'..'z','A'..'Z','-','.','_','0'..'9','*': begin
+            if (not AsName) or (c <> '*') then
+            begin
+              p := CursorX - TxtL;
+              if (p >= 0) and (Length(NewName) < 30) then
+              begin
+                Insert(c, NewName, p + 1);
+                BGPen := Black;
+                FGPen := LightGray;
+                SetText(TxtL, Mid.y, Newname);
+                SetCursorPos(CursorX + 1, Mid.Y);
+                UpdateScreen(False);
+              end;
+            end;
+          end;
+          #8: begin
+            p := CursorX - TxtL;
+            if p > 0 then
+            begin
+              Delete(NewName, p, 1);
+              BGPen := Black;
+              FGPen := LightGray;
+              SetText(TxtL, Mid.y, Newname);
+              SetChar(TxtL + Length(NewName), Mid.y, ' ');
+              SetCursorPos(CursorX - 1, Mid.Y);
+              UpdateScreen(False);
+            end;
+          end;
+        end
+      end;
+    end;
+    Sleep(25);
+  until False;
+  SetCursorType(crHidden);
+end;
+
+{ TAskQuestion }
+
+procedure TAskQuestion.DrawButtons;
+begin
+  FGPen := Black;
+  if YesActive then
+    BGPen := Cyan
+  else
+    BGPen := LightGray;
+  SetText(Mid.x - 6, WindowRect.Bottom, LBorder + 'Yes' + RBorder);
+  if not YesActive then
+    BGPen := Cyan
+  else
+    BGPen := LightGray;
+  SetText(Mid.x + 2, WindowRect.Bottom, LBorder + 'No ' + RBorder);
+  BGPen := LightGray;
+end;
+
+function TAskQuestion.Execute: Integer;
+var
+  Key: TKeyEvent;
+begin
+  YesActive := True;
+  Result := 0;
+  Paint;
+  repeat
+    Key := PollNextKey;
+    case (Key and $FFFF) of
+      $1C0D, $000D: begin
+        if YesActive then
+          Result := 0
+        else
+          Result := 1;
+        Break;
+      end;
+      $0F09: begin
+        YesActive := not YesActive;
+        DrawButtons;
+        UpdateScreen(False);
+      end;
+      $4B00, $34: begin // cursor left
+        if not YesActive then
+        begin
+          YesActive := True;
+          DrawButtons;
+          UpdateScreen(False);
+        end;
+      end;
+      $4D00, $36: begin // cursor right
+        if YesActive then
+        begin
+          YesActive := False;
+          DrawButtons;
+          UpdateScreen(False);
+        end;
+      end;
+      $011B: begin
+        Result := 1;
+        Exit;
+      end;
+    end;
+    Sleep(25);
+  until False;
+end;
+
+{ TBaseDialog }
+
+function TBaseDialog.PollNextKey: TKeyEvent;
+begin
+  Result := GetNextKeyEvent;
+  if Result = ResizeKey then
+    Paint;
+end;
+
+procedure TBaseDialog.DrawWindowBorder;
+var
+  x,y: Integer;
+begin
+  for y := WindowRect.Top to WindowRect.Bottom do
+  begin
+    for x := WindowRect.Left to WindowRect.Right do
     begin
-      if (y = Wind.Top) or (y = Wind.Bottom) then
+      if (y = WindowRect.Top) or (y = WindowRect.Bottom) then
         SetChar(x,y, HLine)
       else
       begin
-        if (x = Wind.Left) or (x = Wind.Right) then
+        if (x = WindowRect.Left) or (x = WindowRect.Right) then
           SetChar(x,y, VLine)
         else
           SetChar(x,y, ' ');
       end;
     end;
   end;
-  SetChar(Wind.Left, Wind.Top, ULCorner);
-  SetChar(Wind.Left, Wind.Bottom, LLCorner);
-  SetChar(Wind.Right, Wind.Bottom, LRCorner);
-  SetChar(Wind.Right, Wind.Top, URCorner);
+  SetChar(WindowRect.Left, WindowRect.Top, ULCorner);
+  SetChar(WindowRect.Left, WindowRect.Bottom, LLCorner);
+  SetChar(WindowRect.Right, WindowRect.Bottom, LRCorner);
+  SetChar(WindowRect.Right, WindowRect.Top, URCorner);
 
-  SetText(Mid.X - Length(Text) div 2, Mid.Y - 2, Text);
+  InnerRect := WindowRect;
+  InnerRect.Inflate(-1,-1);
+end;
 
-  PGL := Wind.Left + 2;
-  PGR := Wind.Right - 2;
-  Pup := Mid.y;
+procedure TBaseDialog.Paint;
+begin
+  mid.x := ScreenWidth div 2;
+  mid.y := ScreenHeight div 2;
+end;
+
+{ TShowMessage }
+
+procedure TShowMessage.DrawButtons;
+begin
+  BGPen := Cyan;
+  FGPen := Black;
+  SetText(Mid.x - 1, WindowRect.Bottom, LBorder + 'OK' + RBorder);
+  BGPen := LightGray;
+end;
+
+procedure TShowMessage.Paint;
+var
+  i: Integer;
+  SL: TStringList;
+  MaxX, MaxY: Integer;
+  s,s1: string;
+begin
+  inherited;
+  SL := TStringList.Create;
+  SL.Text := Text;
+
+  MaxX := 1;
+  i := 0;
+  while i < SL.Count do
+  begin
+    if Length(SL[i]) > ScreenWidth - 6 then
+    begin
+      s := SL[i];
+      s1 := Copy(s, 1, ScreenWidth - 6);
+      SL[i] := s1;
+      Delete(s, 1, ScreenWidth - 6);
+      if Length(SL[i]) > MaxX then
+        MaxX := Length(SL[i]);
+      SL.Insert(i + 1, s1);
+    end
+    else
+    begin
+      if Length(SL[i]) > MAxX then
+        MaxX := Length(SL[i]);
+      i := i + 1;
+    end;
+  end;
+  MaxX := MaxX + 4;
+  MaxY := SL.Count + 4;
+
+  WindowRect.Left := Mid.X - MaxX div 2;
+  WindowRect.Top := Mid.Y - MaxY div 2;
+  WindowRect.Right :=  Mid.X + MaxX div 2;
+  WindowRect.Bottom := Mid.Y + MaxY div 2;
 
   BGPen := LightGray;
   FGPen := Black;
-  for x := PGL to PGR do
-  begin
-    SetChar(x, Pup - 1, ProgressEmpty);
-    SetChar(x, Pup + 1, ProgressEmpty);
-  end;
-  MaxNum := AMaxNumUpper;
-  MaxNum2 := AMaxNumLower;
-  if MaxNum <= 0 then
-    MaxNum := 1;
-  if MaxNum2 <= 0 then
-    MaxNum2 := 1;
+
+  DrawWindowBorder;
+
+
+  for i := 0 to SL.Count - 1 do
+    SetText(InnerRect.left + 1, InnerRect.Top + 1 + i, SL[i]);
+  SL.Free;
 
   // draw Buttons
   DrawButtons;
   UpdateScreen(False);
-  {$WARNINGS OFF}
-  LastCall := GetTickCount;
-  {$WARNINGS ON}
 end;
 
-function UpdateProgress2(Num1, Num2: LongInt; Text1: string = ''; Text2: string = ''): Boolean;
+function TShowMessage.Execute: Integer;
 var
-  w,P,x: LongInt;
   Key: TKeyEvent;
-  t1: Int64;
 begin
-  Result := True;
-  {$WARNINGS OFF}
-  t1 := GetTickCount;
-  {$WARNINGS ON}
-  if t1 - LastCall > 100 then
-  begin
-    LastCall := t1;
-    BGPen := LightGray;
-    FGPen := Black;
-    w := PGR - PGL;
-    p := Round(Num1/MaxNum * w);
-    writeln('num1: ', num1 , ' maxNum ', MaxNum,' w ', w, ' p ', P, ' PGL ', PGL, ' PGR ', PGR );
-    for x := PGL to PGL + P do
-    begin
-      SetChar(x, Pup - 1, ProgressFull);
+  Result := 0;
+  Paint;
+  repeat
+    Key := PollNextKey;
+    case (Key and $FFFF) of
+      $1C0D: Break;
     end;
-    p := Round(Num2/MaxNum2 * w);
-    for x := PGL to PGL + P do
-    begin
-      SetChar(x, Pup + 1, ProgressFull);
-    end;
-    if Text1 <> '' then
-    begin
-      for x := PGL to PGR do
-      begin
-        SetChar(x, Pup - 2, ' ');
-      end;
-      Text1 := LimitName(Text1, w - 10, False);
-      p := w div 2 - Length(Text1) div 2 + 5;
-      SetText(p, Pup - 2, Text1);
-    end;
-    if Text2 <> '' then
-    begin
-      for x := PGL to PGR do
-      begin
-        SetChar(x, Pup, ' ');
-      end;
-      Text2 := LimitName(Text2, w - 10, False);
-      p := w div 2 - Length(Text2) div 2;
-      SetText(p, Pup, Text2);
-    end;
-    UpdateScreen(False);
-  end;
-  Key := PollKeyEvent;
-  // Break on Enter -> Cancel
-  if (Key and $FFFF) = $1C0D then
-    Result := False;
+    Sleep(25);
+  until (Key and $ff00) = $0100;
 end;
 
 end.

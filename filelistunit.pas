@@ -72,6 +72,7 @@ type
     FActiveElement: Integer;
     FTopElement: Integer;
     FBottomElement: Integer;
+    function GetActiveEntry: TListEntry;
     procedure SetActiveElement(AValue: Integer);
     procedure SetCurrentPath(AValue: string);
     procedure DrawBorder;
@@ -80,20 +81,24 @@ type
     procedure DrawActive(NActive: Integer);
     procedure DrawEntry(Idx: Integer);
 
-    procedure DoListOfSelectedFile(Recursive: Boolean; FL: TEntryList; out Dirs: integer; out Files: Integer);
+    procedure DoListOfSelectedFile(Recursive: Boolean; FL: TEntryList; out Dirs: integer; out Files: Integer; out Size: Int64);
 
     procedure SortList;
   public
     constructor Create(ARect: TRect); virtual;
     destructor Destroy; override;
 
+    procedure Resize(ARect: TRect);
+
     procedure Update(UpdateList: Boolean);
     procedure GoToParent;
     procedure EnterPressed;
+    function ResultOfEntry(out NewPath: string): Boolean;
 
     procedure CopyFiles(Target: string); // F5
     procedure MakeDir(); // F7
     procedure DeleteSelected(); // F8
+    procedure Rename(); // Shift F6
 
     procedure ActivateFile(AName: string);
     procedure SelectActiveEntry;
@@ -103,6 +108,7 @@ type
     property CurrentPath: string read FCurrentPath write SetCurrentPath;
     property IsActive: Boolean read FIsActive write SetIsActive;
     property ActiveElement: Integer read FActiveElement write SetActiveElement;
+    property ActiveEntry: TListEntry read GetActiveEntry;
   end;
 
 
@@ -258,6 +264,13 @@ begin
   DrawActive(AValue);
 end;
 
+function TFileList.GetActiveEntry: TListEntry;
+begin
+  Result := nil;
+  if InRange(FActiveElement, 0, FFileList.Count - 1) then
+    Result := FFileList[FActiveElement];
+end;
+
 procedure TFileList.DrawBorder;
 var
   i: Integer;
@@ -299,7 +312,6 @@ begin
   end
   else
     SetText(FRect.Left + 2, FRect.Top, LeftEdge + s + RightEdge);
-
 end;
 
 procedure TFileList.DrawContents(UpdateList: Boolean);
@@ -371,7 +383,13 @@ begin
     end;
     SortList;
 
-    FTopElement := 0;
+    if (FTopElement < 0) or (FTopElement > FFileList.Count - 1) then
+      FTopElement := 0
+    else
+    begin
+      if FFileList.Count - 1 - FTopElement <= FInnerRect.Height then
+        FTopElement := 0;
+    end;
     FBottomElement := Min(FFileList.Count - 1, FInnerRect.Height);
     if FActiveElement >= FFileList.Count then
       FActiveElement := 0;
@@ -540,10 +558,20 @@ begin
   inherited Destroy;
 end;
 
+procedure TFileList.Resize(ARect: TRect);
+begin
+  FRect := ARect;
+  FInnerRect := FRect;
+  FInnerRect.Inflate(-1, -1);
+  FInnerRect.Height := FInnerRect.Height - 2;
+  Update(False);
+end;
+
 procedure TFileList.Update(UpdateList: Boolean);
 begin
   DrawBorder();
   DrawContents(UpdateList);
+  DrawActive(ActiveElement);
   UpdateScreen(False);
 end;
 
@@ -559,6 +587,7 @@ begin
   if s[p] = DriveDelim then
   begin
     CurrentPath := '';
+    ActivateFile(s);
   end
   else
   begin
@@ -573,17 +602,64 @@ procedure TFileList.EnterPressed;
 var
   s: string;
 begin
-  //
   if InRange(FActiveElement, 0, FFileList.Count - 1) then
   begin
     s := CurrentPath;
     case FFileList[FActiveElement].EType of
-      etDir: CurrentPath := IncludeTrailingPathDelimiter(s) + FFileList[FActiveElement].Name;
+      etDir: begin
+        CurrentPath := IncludeTrailingPathDelimiter(s) + FFileList[FActiveElement].Name;
+        ActiveElement :=  0;
+      end;
       etDrive,
-      etAssign: CurrentPath := FFileList[FActiveElement].Name;
+      etAssign: begin
+        CurrentPath := FFileList[FActiveElement].Name;
+        ActiveElement :=  0;
+      end;
       etParent: GoToParent;
       else
         //
+    end;
+  end;
+end;
+
+function TFileList.ResultOfEntry(out NewPath: string): Boolean;
+var
+  p: SizeInt;
+  s: string;
+begin
+  Result := False;
+  if InRange(FActiveElement, 0, FFileList.Count - 1) then
+  begin
+    s := CurrentPath;
+    case FFileList[FActiveElement].EType of
+      etDir: begin
+        NewPath := IncludeTrailingPathDelimiter(s) + FFileList[FActiveElement].Name;
+        Result := True;
+      end;
+      etDrive,
+      etAssign: begin
+        NewPath := FFileList[FActiveElement].Name;
+        Result := True;
+      end;
+      etParent: begin
+        s := CurrentPath;
+        p := Length(s);
+        if p = 0 then
+          Exit;
+        if s[p] = DriveDelim then
+        begin
+          NewPath := '';
+          Result := True;
+        end
+        else
+        begin
+          p := LastDelimiter(PathDelim + DriveDelim, s);
+          NewPath := Copy(s, 1, p);
+          Result := True;
+        end;
+      end;
+      else
+        Result := False;
     end;
   end;
 end;
@@ -605,7 +681,10 @@ begin
   end;
 end;
 
-procedure RecurseDirs(BasePath, AName: string; FL: TEntryList; var Dirs: Integer; var Files: Integer);
+var
+  CountPG: TSingleProgress;
+
+procedure RecurseDirs(BasePath, AName: string; FL: TEntryList; var Dirs: Integer; var Files: Integer; var Size: Int64);
 var
   Info: TSearchRec;
   Path: string;
@@ -618,25 +697,31 @@ begin
       begin
         Inc(Dirs);
         FL.AddDir(Path + Info.Name);
-        RecurseDirs(BasePath, Path + Info.Name, FL, Dirs, Files);
+        RecurseDirs(BasePath, Path + Info.Name, FL, Dirs, Files, Size);
       end
       else
       begin
         Inc(Files);
         FL.AddFile(Path + Info.Name, Info.Size);
+        Size := Size + Info.Size;
       end;
     Until FindNext(Info) <> 0;
     end;
   FindClose(Info);
 end;
 
-procedure TFileList.DoListOfSelectedFile(Recursive: Boolean; FL: TEntryList; out Dirs: integer; out Files: Integer);
+procedure TFileList.DoListOfSelectedFile(Recursive: Boolean; FL: TEntryList; out Dirs: integer; out Files: Integer; out Size: Int64);
 var
   i: Integer;
   Found: Boolean;
 begin
+  CountPG := TSingleProgress.Create;
+  CountPG.Text := 'Counting Files';
+  CountPG.MaxValue := FFileList.Count;
+  CountPG.Execute;
   dirs := 0;
   Files := 0;
+  Size := 0;
   Found := False;
   for i := 0 to FFileList.Count - 1 do
   begin
@@ -646,18 +731,18 @@ begin
       begin
         FL.AddFile(FFileList[i].Name, FFileList[i].Size);
         Inc(Files);
+        Size := Size + FFileList[i].Size;
       end;
       if FFileList[i].EType = etDir then
       begin
         FL.AddDir(FFileList[i].Name);
         Inc(Dirs);
         if Recursive then
-        begin
-          RecurseDirs(IncludeTrailingPathDelimiter(FCurrentPath), FFileList[i].Name, FL, Dirs, Files);
-        end;
+          RecurseDirs(IncludeTrailingPathDelimiter(FCurrentPath), FFileList[i].Name, FL, Dirs, Files, Size);
       end;
       Found := True;
     end;
+    CountPG.UpdateValue(i, 'Counting Files ' + IntToStr(Files + Dirs));
   end;
   if (not Found) and inRange(FActiveElement, 1, FFileList.Count - 1) then
   begin
@@ -665,15 +750,14 @@ begin
     begin
       FL.AddFile(FFileList[FActiveElement].Name, FFileList[FActiveElement].Size);
       Inc(Files);
+      Size := Size + FFileList[FActiveElement].Size;
     end;
     if FFileList[FActiveElement].EType = etDir then
     begin
       FL.AddDir(FFileList[FActiveElement].Name);
       Inc(Dirs);
       if Recursive then
-      begin
-        RecurseDirs(IncludeTrailingPathDelimiter(FCurrentPath), FFileList[FActiveElement].Name, FL, Dirs, Files);
-      end;
+        RecurseDirs(IncludeTrailingPathDelimiter(FCurrentPath), FFileList[FActiveElement].Name, FL, Dirs, Files, Size);
     end;
   end;
 end;
@@ -684,6 +768,8 @@ var
   FL: TEntryList;
   i, Dirs, Files: Integer;
   NotDeleted: Integer;
+  PG: TSingleProgress;
+  Size: Int64;
 begin
   FL := TEntryList.Create;
   try
@@ -691,16 +777,21 @@ begin
     Files := 0;
     NotDeleted := 0;
     // make a list of all
-    DoListOfSelectedFile(True, FL, dirs, files);
+    DoListOfSelectedFile(True, FL, dirs, files, Size);
     if FL.Count > 0 then
     begin
-      if AskQuestion('Delete ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files?') then
+      if AskQuestion('Delete ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files (' + Trim(FormatSize(Size)) + 'byte)?') then
       begin
-        StartProgress('Delete ', FL.Count);
+        PG := TSingleProgress.Create;
+        PG.Text :=  'Delete';
+        PG.MaxValue := FL.Count;
+        PG.Execute;
+        //StartProgress('Delete ', FL.Count);
         for i := FL.Count - 1 downto 0 do
         begin
           try
-            if not UpdateProgress((FL.Count - 1 - i) + 1, 'Delete ' + FL[i].Name) then
+            //if not UpdateProgress((FL.Count - 1 - i) + 1, 'Delete ' + FL[i].Name) then
+            if not PG.UpdateValue((FL.Count - 1 - i) + 1, 'Delete ' + FL[i].Name) then
             begin
               ShowMessage('Delete stopped.');
               NotDeleted := 0;
@@ -712,6 +803,7 @@ begin
             Inc(NotDeleted);
           end;
         end;
+        PG.Free;
         if NotDeleted > 0 then
           ShowMessage('Cannot delete ' + IntToStr(NotDeleted) + ' files/dirs');
         Update(True);
@@ -719,6 +811,21 @@ begin
     end;
   finally
     FL.Free;
+  end;
+end;
+
+procedure TFileList.Rename();
+var
+  NewName: string;
+begin
+  if InRange(FActiveElement, 0, FFileList.Count - 1) then
+  begin
+    NewName := FFileList[FActiveElement].Name;
+    if AskForName('New name for "' + NewName + '"', NewName,  True) then
+    begin
+      SysUtils.RenameFile(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name, IncludeTrailingPathDelimiter(FCurrentPath) + NewName);
+      Update(True);
+    end;
   end;
 end;
 
@@ -783,27 +890,37 @@ var
   Msg, NewName: string;
   StartTime, CurTime: LongWord;
   Speed: Extended;
+  PG: TSingleProgress;
+  PG2: TDoubleProgress;
+  Size: Int64;
 begin
   FL := TEntryList.Create;
   try
+    PG := nil;
+    PG2 := nil;
     Src := nil;
     Dest := nil;
     dirs := 0;
     Files := 0;
     NotCopied := 0;
     // make a list of all
-    DoListOfSelectedFile(True, FL, dirs, files);
+    DoListOfSelectedFile(True, FL, dirs, files, Size);
     if FL.Count > 0 then
     begin
-      if AskQuestion('Copy ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files?') then
+      if AskQuestion('Copy ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files (' + Trim(FormatSize(Size))  + 'byte)? ') then
       begin
         //---------- copy one file
         if (FL.Count = 1) and (FL[0].EType = etFile) then
         begin
-          StartProgress('Copy ', FL[0].Size);
+          PG := TSingleProgress.Create;
+          PG.Text := 'Copy ';
+          PG.MaxValue := FL[0].Size;
+          PG.Execute;
+          //StartProgress('Copy ', FL[0].Size);
           Buffer := AllocMem(BufferSize);
           try
-            UpdateProgress(0, FL[0].Name);
+            PG.UpdateValue(0, FL[0].Name);
+            //UpdateProgress(0, FL[0].Name);
             // check if the same file
             {$ifdef HASAMIGA}
             if FileExists(IncludeTrailingPathDelimiter(Target) + FL[0].Name) then
@@ -835,7 +952,8 @@ begin
               begin
                 Speed := NumBytes / ((CurTime - StartTime) / 1000);
               end;
-              if not UpdateProgress(NumBytes, 'Copy file ' + FormatSize(NumBytes) + '/' + AllBytesStr + ' with ' + FormatSize(Speed) + 'byte/s') then
+              //if not UpdateProgress(NumBytes, 'Copy file ' + FormatSize(NumBytes) + '/' + AllBytesStr + ' with ' + FormatSize(Speed) + 'byte/s') then
+              if not PG.UpdateValue(NumBytes, 'Copy file ' + FormatSize(NumBytes) + '/' + AllBytesStr + ' with ' + FormatSize(Speed) + 'byte/s') then
                 raise Exception.Create('copy stopped');
               if Dest.Write(Buffer^, Count) <> Count then
                 raise Exception.Create('fail to write');
@@ -856,6 +974,7 @@ begin
               Msg := E.Message;
             end;
           end;
+          PG.Free;
           Src.Free;
           Dest.Free;
           FreeMem(Buffer);
@@ -869,7 +988,13 @@ begin
             if FL[i].EType = etFile then
               AllBytes := AllBytes + FL[i].Size;
           end;
-          StartProgress2('Copy ', FL.Count, AllBytes);
+          PG2 := TDoubleProgress.Create;
+          PG2.Text := 'Copy';
+          PG2.Text2 := '';
+          PG2.MaxValue := FL.Count;
+          PG2.MaxValue2 := AllBytes;
+          PG2.Execute;
+          //StartProgress2('Copy ', FL.Count, AllBytes);
           //
           Buffer := AllocMem(BufferSize);
           AllBytesStr := FormatSize(AllBytes);
@@ -881,7 +1006,8 @@ begin
             Src := nil;
             Dest := nil;
             try
-              if not UpdateProgress2(i + 1, AllNumBytes, 'Copy ' + FL[i].Name, FormatSize(AllNumBytes) + 'byte / ' + AllBytesStr + 'byte') then
+              //if not UpdateProgress2(i + 1, AllNumBytes, 'Copy ' + FL[i].Name, FormatSize(AllNumBytes) + 'byte / ' + AllBytesStr + 'byte') then
+              if not PG2.UpdateValue2(i + 1, 'Copy ' + FL[i].Name, AllNumBytes, FormatSize(AllNumBytes) + 'byte / ' + AllBytesStr + 'byte') then
               begin
                 ShowMessage('Copy stopped.');
                 NotCopied := 0;
@@ -920,7 +1046,8 @@ begin
                   Speed := 0.0;
                   if CurTime - StartTime > 0 then
                     Speed := AllNumBytes / ((CurTime - StartTime) / 1000);
-                  if not UpdateProgress2(i + 1, AllNumBytes, 'Copy ' + FL[i].Name, FormatSize(AllNumBytes) + 'byte /' + AllBytesStr + 'byte with ' + FormatSize(Speed) + 'byte/s') then
+                  //if not UpdateProgress2(i + 1, AllNumBytes, 'Copy ' + FL[i].Name, FormatSize(AllNumBytes) + 'byte /' + AllBytesStr + 'byte with ' + FormatSize(Speed) + 'byte/s') then
+                  if not PG2.UpdateValue2(i + 1, 'Copy ' + FL[i].Name, AllNumBytes, FormatSize(AllNumBytes) + 'byte / ' + AllBytesStr + 'byte with ' + FormatSize(Speed) + 'byte/s') then
                     raise Exception.Create('copy stopped');
                   WrittenCount := Dest.Write(Buffer^, Count);
                   if WrittenCount <> Count then
@@ -945,6 +1072,7 @@ begin
               end;
             end;
           end;
+          PG2.Free;
           FreeMem(Buffer);
         end;
         if NotCopied > 0 then
