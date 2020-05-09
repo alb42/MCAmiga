@@ -58,7 +58,17 @@ begin
     $1312, $1300: Src.Update(True);                    // Ctrl + R Alt + R -> Reload
     $180F, $1800: Dest.CurrentPath := Src.CurrentPath; // Ctrl + O Alt + O -> copy path to dest
     $2004, $2000: Src.CurrentPath := '';               // Ctrl + D Alt + D -> back to drives/Assign
-    kbdInsert, $23, $30, $20: Src.SelectActiveEntry;   // Insert, #, 0, Space -> Select file
+    $1F13: Src.SearchList;                             // Crtl + s  -> jump mode
+    kbdInsert, $23, $30, $20: begin
+      if ((st and kbShift) <> 0) and (TranslateKeyEvent(Ev) and $ffff = $20) then
+      begin
+        Src.ScanSize;
+        Left.Update(False);
+        Right.Update(False);
+      end
+      else
+        Src.SelectActiveEntry;   // Insert, #, 0, Space -> Select file
+    end;
     $002B: begin
       Src.SelectByPattern(True);                       // + -> Select files by pattern
       Left.Update(False);
@@ -136,13 +146,18 @@ begin
     Left.Resize(LeftSide);
     Right.Resize(rightSide);
   end;
+end;
 
+procedure IdleEvent;
+begin
+  Src.IdleEvent;
 end;
 
 procedure StartMe;
 begin
   OnKeyPress := @KeyEvent;
   OnResize := @ResizeEvent;
+  OnIdle := @IdleEvent;
 
   LeftSide := Rect(0, 0, (ScreenWidth div 2) - 1, ScreenHeight - 1);
   RightSide := Rect(LeftSide.Right + 1, 0, ScreenWidth - 1, ScreenHeight - 1);

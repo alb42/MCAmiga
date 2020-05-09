@@ -124,19 +124,17 @@ uses
 const       //.........1.........2.........3.........4.........5........6.........7
   HelpText = '        MyCommander Amiga Version 0.1       '#13#10 +
              '        =============================        '#13#10 +
-             '  ### Keys: ###  '#13#10 +
-             ' F1      - This Help Text'#13#10 +
-             ' F5      - Copy selected Files'#13#10 +
-             ' F6      - Move selected Files'#13#10 +
-             ' F7      - Create a new Directory'#13#10 +
-             ' F8      - Delete selected Files'#13#10 +
-             ' F10     - Quit Program'#13#10 +
-             ' TAB     - Set Focus to other Side'#13#10 +
+             ' F1  - Help              Ins  - Select File'#13#10 +
+             ' F5  - Copy Files        +    - Select by pattern'#13#10 +
+             ' (F6  - Move Files)      -    - Deselect by pattern'#13#10 +
+             ' F7  - Create Directory  TAB  - Switch Focus'#13#10 +
+             ' F8  - Delete Files      Alt F1/F2 - Show Drives'#13#10 +
+             ' F10 - Quit Program      Backspace - Parent'#13#10 +
              ' '#13#10 +
+             ' Shift + Enter - Open Dir in other side'#13#10 +
              ' Ctrl + R - Rescan Directory'#13#10 +
              ' Ctrl + O - Set Destination Directory to Source Directory'#13#10 +
              '';
-
 
 procedure ShowHelp;
 begin
@@ -465,7 +463,7 @@ begin
       begin
         c := GetKeyEventChar(Key);
         case c of
-          'a'..'z','A'..'Z','-','.','_','0'..'9','*': begin
+          'a'..'z','A'..'Z','-','.','_','0'..'9',' ','*': begin
             if (not AsName) or (c <> '*') then
             begin
               p := CursorX - TxtL;

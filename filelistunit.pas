@@ -8,7 +8,7 @@ uses
   {$ifdef HASAMIGA}
   AmigaDOS,
   {$endif}
-  Video, Classes, SysUtils, Math, fgl, StrUtils;
+  Video, Keyboard, Classes, SysUtils, Math, fgl, StrUtils;
 
 const
   UpperLeftEdge = #201;
@@ -40,7 +40,7 @@ type
   TListEntry = class
     Name: string;
     EType: TEntryType;
-    Size: Integer;
+    Size: Int64;
     Selected: Boolean;
   public
     constructor Create; virtual;
@@ -72,6 +72,7 @@ type
     FActiveElement: Integer;
     FTopElement: Integer;
     FBottomElement: Integer;
+    ActShowStart: LongInt;
     function GetActiveEntry: TListEntry;
     procedure SetActiveElement(AValue: Integer);
     procedure SetCurrentPath(AValue: string);
@@ -84,6 +85,7 @@ type
     procedure DoListOfSelectedFile(Recursive: Boolean; FL: TEntryList; out Dirs: integer; out Files: Integer; out Size: Int64);
 
     procedure SortList;
+    procedure CheckSelected;
   public
     constructor Create(ARect: TRect); virtual;
     destructor Destroy; override;
@@ -103,6 +105,11 @@ type
     procedure ActivateFile(AName: string);
     procedure SelectActiveEntry;
 
+    procedure ScanSize;
+
+    procedure IdleEvent;
+    procedure SearchList;
+
     procedure SelectByPattern(DoSelect: Boolean);
 
     property CurrentPath: string read FCurrentPath write SetCurrentPath;
@@ -121,7 +128,7 @@ type
 implementation
 
 uses
-  DialogUnit;
+  DialogUnit, EventUnit;
 
 function LimitName(AName: string; MaxLength: Integer; PathMode: Boolean = False): string;
 var
@@ -162,6 +169,7 @@ end;
 
 function FormatSize(Size: Single): string;
 begin
+  Size := Abs(Size);
   if Size < 1000 then
     Result := Format('%6.0f  ', [Size])
   else
@@ -237,6 +245,7 @@ end;
 constructor TListEntry.Create;
 begin
   Selected := False;
+  Size := -1;
 end;
 
 procedure TListEntry.Assign(Src: TListEntry);
@@ -261,6 +270,7 @@ procedure TFileList.SetActiveElement(AValue: Integer);
 begin
   if FActiveElement = AValue then
     Exit;
+  ActShowStart := 0;
   DrawActive(AValue);
 end;
 
@@ -312,6 +322,7 @@ begin
   end
   else
     SetText(FRect.Left + 2, FRect.Top, LeftEdge + s + RightEdge);
+  CheckSelected;
 end;
 
 procedure TFileList.DrawContents(UpdateList: Boolean);
@@ -439,7 +450,6 @@ begin
     for i := FTopElement to FBottomElement do
       DrawEntry(i);
     UpdateScreen(False);
-    Exit;
   end;
 
   if FActiveElement <> OldActive then
@@ -453,7 +463,7 @@ begin
     l := Length(s);
     if l > FInnerRect.Width then
     begin
-      s := Copy(s, 1, FInnerRect.Width - 1);
+      s := Copy(s, 1 + ActShowStart, FInnerRect.Width - 1);
       l := Length(s);
     end;
     SetText(FInnerRect.Left, FRect.Bottom - 1, s);
@@ -510,7 +520,12 @@ begin
     // all 8 chars long
     case FFileList[Idx].EType of
       etFile: s := FormatSize(FFileList[Idx].Size);
-      etDir:    s := '   <Dir>';
+      etDir: begin
+        if FFileList[Idx].Size < 0 then
+          s := '   <Dir>'
+        else
+          s := FormatSize(FFileList[Idx].Size);
+      end;
       etParent: s := '<Parent>';
       etDrive:  s := ' <Drive>';
       etAssign: s := '<Assign>';
@@ -537,6 +552,38 @@ end;
 procedure TFileList.SortList;
 begin
   FFileList.Sort(@ListCompare);
+end;
+
+procedure TFileList.CheckSelected;
+var
+  n,i: LongInt;
+  s: Single;
+  st: String;
+begin
+  n := 0;
+  s := 0;
+  for i := 0 to FFileList.Count - 1 do
+  begin
+    if FFileList[i].Selected then
+    begin
+      Inc(n);
+      if FFileList[i].Size > 0 then
+        s := s + FFileList[i].Size;
+    end;
+  end;
+  BGPen := Blue;
+  FGPen := LightGray;
+  for i := FRect.Left + 1 to FRect.Right - 1 do
+  begin
+    SetChar(i, FRect.Bottom - 2, SingleLine);
+  end;
+  SetText(FRect.Left + 1, FRect.Bottom - 2, ' ' + IntToStr(n) + '/' + IntToStr(FFileList.Count) + ' ');
+  if s > 0 then
+  begin
+    st := Trim(FormatSize(s) + 'byte');
+    SetText(FRect.Right - 1 - Length(st), FRect.Bottom - 2, st);
+  end;
+  UpdateScreen(False);
 end;
 
 constructor TFileList.Create(ARect: TRect);
@@ -572,6 +619,7 @@ begin
   DrawBorder();
   DrawContents(UpdateList);
   DrawActive(ActiveElement);
+  CheckSelected;
   UpdateScreen(False);
 end;
 
@@ -682,7 +730,7 @@ begin
 end;
 
 var
-  CountPG: TSingleProgress;
+  CountPG: TSingleProgress = nil;
 
 procedure RecurseDirs(BasePath, AName: string; FL: TEntryList; var Dirs: Integer; var Files: Integer; var Size: Int64);
 var
@@ -690,19 +738,23 @@ var
   Path: string;
 begin
   Path := IncludeTrailingPathDelimiter(AName);
-  if FindFirst (BasePath + Path + '*', faAnyFile and faDirectory, Info) = 0 then
+  if Assigned(CountPG) then
+    CountPG.UpdateValue(0, BasePath + Path + ' ' + IntToStr(Files + Dirs));
+  if FindFirst(BasePath + Path + '*', faAnyFile and faDirectory, Info) = 0 then
   begin
     repeat
       if (Info.Attr and faDirectory) <> 0 then
       begin
         Inc(Dirs);
-        FL.AddDir(Path + Info.Name);
+        if Assigned(FL) then
+          FL.AddDir(Path + Info.Name);
         RecurseDirs(BasePath, Path + Info.Name, FL, Dirs, Files, Size);
       end
       else
       begin
         Inc(Files);
-        FL.AddFile(Path + Info.Name, Info.Size);
+        if Assigned(FL) then
+          FL.AddFile(Path + Info.Name, Info.Size);
         Size := Size + Info.Size;
       end;
     Until FindNext(Info) <> 0;
@@ -760,6 +812,8 @@ begin
         RecurseDirs(IncludeTrailingPathDelimiter(FCurrentPath), FFileList[FActiveElement].Name, FL, Dirs, Files, Size);
     end;
   end;
+  CountPG.Free;
+  CountPG := nil;
 end;
 
 //############ Delete
@@ -820,11 +874,14 @@ var
 begin
   if InRange(FActiveElement, 0, FFileList.Count - 1) then
   begin
-    NewName := FFileList[FActiveElement].Name;
-    if AskForName('New name for "' + NewName + '"', NewName,  True) then
+    if FFileList[FActiveElement].EType in [etDir, etFile] then
     begin
-      SysUtils.RenameFile(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name, IncludeTrailingPathDelimiter(FCurrentPath) + NewName);
-      Update(True);
+      NewName := ExcludeTrailingPathDelimiter(FFileList[FActiveElement].Name);
+      if AskForName('New name for "' + NewName + '"', NewName,  True) then
+      begin
+        SysUtils.RenameFile(IncludeTrailingPathDelimiter(FCurrentPath) + ExcludeTrailingPathDelimiter(FFileList[FActiveElement].Name), IncludeTrailingPathDelimiter(FCurrentPath) + NewName);
+        Update(True);
+      end;
     end;
   end;
 end;
@@ -850,7 +907,135 @@ begin
     FFileList[FActiveElement].Selected := not FFileList[FActiveElement].Selected;
     DrawEntry(FActiveElement);
     ActiveElement := FActiveElement + 1;
+    CheckSelected;
   end;
+end;
+
+procedure TFileList.ScanSize;
+var
+  Size: Int64;
+  Files, Dirs: Integer;
+begin
+  if InRange(FActiveElement, 0, FFileList.Count - 1) then
+  begin
+    if (FFileList[FActiveElement].EType = etDir) and (FFileList[FActiveElement].Size < 0) then
+    begin
+      Dirs := 0;
+      Files := 0;
+      Size := 0;
+      RecurseDirs(FCurrentPath, FFileList[FActiveElement].Name, nil, Dirs, Files, Size);
+      FFileList[FActiveElement].Size := Size;
+    end;
+  end;
+  ActiveElement := ActiveElement + 1;
+end;
+
+procedure TFileList.IdleEvent;
+var
+  s: String;
+begin
+  if InRange(FActiveElement, 0, FFileList.Count - 1) then
+  begin
+    s := FFileList[FActiveElement].Name;
+    if Length(s) > FInnerRect.Width then
+    begin
+      writeln('is too long ', ActShowStart);
+      Inc(ActShowStart);
+      if ActShowStart > (Length(s) - FInnerRect.Width) then
+        ActShowStart := 0;
+      writeln('  new actshow start', ActShowStart);
+      DrawActive(FActiveElement);
+    end;
+  end;
+end;
+
+procedure TFileList.SearchList;
+var
+  i: LongInt;
+  Key: TKeyEvent;
+  C: Char;
+  NSearchName, SearchName: string;
+  Found: Boolean;
+  Len: Integer;
+begin
+  // Enter SearchMode:
+  BGPen := Cyan;
+  FGPen := Black;
+  SearchName := '';
+  NSearchName := '';
+  for i := FInnerRect.Left to FInnerRect.Right do
+  begin
+    SetChar(i, FRect.Bottom - 1, ' ');
+  end;
+  SetCursorType(crUnderline);
+  SetCursorPos(FInnerRect.Left, FRect.Bottom - 1);
+  repeat
+    Key := GetNextKeyEvent;
+    if (Key and $FFFF) <> 0 then
+    begin
+      C := GetKeyEventChar(Key);
+      if c <> #0 then
+      begin
+        if c = #9 then
+        begin
+          c := #0;
+          Break;
+        end;
+        if c = #8 then
+        begin
+          if Length(SearchName) > 0 then
+            NSearchName := Copy(SearchName, 1, Length(SearchName) - 1);
+        end
+        else
+          NSearchName := SearchName + c;
+        Len := Length(NSearchName);
+        if Len > 30 then
+          Break;
+        Found := False;
+        for i := FActiveElement to FFileList.Count - 1 do
+        begin
+          if LowerCase(Copy(FFileList[i].Name, 1, Len)) = LowerCase(NSearchName) then
+          begin
+            ActiveElement := i;
+            SearchName := NSearchName;
+            Found := True;
+            Break;
+          end;
+        end;
+        if (not Found) and (FActiveElement > 0) then
+        begin
+          for i := 0 to FFileList.Count - 1 do
+          begin
+            if LowerCase(Copy(FFileList[i].Name, 1, Len)) = LowerCase(NSearchName) then
+            begin
+              ActiveElement := i;
+              SearchName := NSearchName;
+              Found := True;
+              Break;
+            end;
+          end;
+        end;
+        if Found then
+        begin
+          BGPen := Cyan;
+          FGPen := Black;
+          for i := FInnerRect.Left to FInnerRect.Right do
+            SetChar(i, FRect.Bottom - 1, ' ');
+          SetCursorPos(FInnerRect.Left + Length(NSearchName), FRect.Bottom - 1);
+          SetText(FinnerRect.Left, FRect.Bottom - 1, NSearchName);
+          UpdateScreen(False);
+        end;
+      end;
+      // leave on all not char characters
+      if c = #0 then
+      begin
+        Break;
+      end;
+    end;
+    Sleep(25);
+  until False;
+  SetCursorType(crHidden);
+  DrawActive(FActiveElement);
 end;
 
 procedure TFileList.SelectByPattern(DoSelect: Boolean);
@@ -873,6 +1058,7 @@ begin
         else
       end;
     end;
+    CheckSelected;
   end;
 end;
 
@@ -900,6 +1086,7 @@ begin
     PG2 := nil;
     Src := nil;
     Dest := nil;
+    Buffer := nil;
     dirs := 0;
     Files := 0;
     NotCopied := 0;
@@ -925,7 +1112,7 @@ begin
             {$ifdef HASAMIGA}
             if FileExists(IncludeTrailingPathDelimiter(Target) + FL[0].Name) then
             begin
-              SrcLock := Lock(IncludeTrailingPathDelimiter(Target) + FL[0].Name, SHARED_LOCK);
+              SrcLock := Lock(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name, SHARED_LOCK);
               DestLock := Lock(IncludeTrailingPathDelimiter(Target) + FL[0].Name, SHARED_LOCK);
               IsSame := SameLock(SrcLock, DestLock);
               Unlock(SrcLock);
@@ -1086,6 +1273,7 @@ begin
         begin
           for i := 0 to FFileList.Count - 1 do
             FFileList[i].Selected := False;
+          CheckSelected;
         end;
       end;
     end;
