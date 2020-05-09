@@ -126,7 +126,7 @@ const       //.........1.........2.........3.........4.........5........6.......
              '        =============================        '#13#10 +
              ' F1  - Help              Ins  - Select File'#13#10 +
              ' F5  - Copy Files        +    - Select by pattern'#13#10 +
-             ' (F6  - Move Files)      -    - Deselect by pattern'#13#10 +
+             ' F6  - Move Files        -    - Deselect by pattern'#13#10 +
              ' F7  - Create Directory  TAB  - Switch Focus'#13#10 +
              ' F8  - Delete Files      Alt F1/F2 - Show Drives'#13#10 +
              ' F10 - Quit Program      Backspace - Parent'#13#10 +

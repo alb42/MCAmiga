@@ -92,7 +92,12 @@ begin
     end;
     kbdF6: begin                                      // F6 -> Move/Rename
       if st and kbShift <> 0 then
-        Src.Rename();
+        Src.Rename()
+      else
+      begin
+        Src.MoveFiles(Dest.CurrentPath);
+        Dest.Update(True);
+      end;
       Left.Update(False);
       Right.Update(False);
     end;

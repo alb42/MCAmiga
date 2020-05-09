@@ -98,6 +98,7 @@ type
     function ResultOfEntry(out NewPath: string): Boolean;
 
     procedure CopyFiles(Target: string); // F5
+    procedure MoveFiles(Target: string); // F6
     procedure MakeDir(); // F7
     procedure DeleteSelected(); // F8
     procedure Rename(); // Shift F6
@@ -1103,11 +1104,9 @@ begin
           PG.Text := 'Copy ';
           PG.MaxValue := FL[0].Size;
           PG.Execute;
-          //StartProgress('Copy ', FL[0].Size);
           Buffer := AllocMem(BufferSize);
           try
             PG.UpdateValue(0, FL[0].Name);
-            //UpdateProgress(0, FL[0].Name);
             // check if the same file
             {$ifdef HASAMIGA}
             if FileExists(IncludeTrailingPathDelimiter(Target) + FL[0].Name) then
@@ -1139,9 +1138,8 @@ begin
               begin
                 Speed := NumBytes / ((CurTime - StartTime) / 1000);
               end;
-              //if not UpdateProgress(NumBytes, 'Copy file ' + FormatSize(NumBytes) + '/' + AllBytesStr + ' with ' + FormatSize(Speed) + 'byte/s') then
               if not PG.UpdateValue(NumBytes, 'Copy file ' + FormatSize(NumBytes) + '/' + AllBytesStr + ' with ' + FormatSize(Speed) + 'byte/s') then
-                raise Exception.Create('copy stopped');
+                raise Exception.Create('Copy stopped');
               if Dest.Write(Buffer^, Count) <> Count then
                 raise Exception.Create('fail to write');
             until Count = 0
@@ -1181,7 +1179,6 @@ begin
           PG2.MaxValue := FL.Count;
           PG2.MaxValue2 := AllBytes;
           PG2.Execute;
-          //StartProgress2('Copy ', FL.Count, AllBytes);
           //
           Buffer := AllocMem(BufferSize);
           AllBytesStr := FormatSize(AllBytes);
@@ -1193,7 +1190,6 @@ begin
             Src := nil;
             Dest := nil;
             try
-              //if not UpdateProgress2(i + 1, AllNumBytes, 'Copy ' + FL[i].Name, FormatSize(AllNumBytes) + 'byte / ' + AllBytesStr + 'byte') then
               if not PG2.UpdateValue2(i + 1, 'Copy ' + FL[i].Name, AllNumBytes, FormatSize(AllNumBytes) + 'byte / ' + AllBytesStr + 'byte') then
               begin
                 ShowMessage('Copy stopped.');
@@ -1217,7 +1213,7 @@ begin
                   Unlock(SrcLock);
                   UnLock(DestLock);
                   if IsSame = LOCK_SAME then
-                    raise Exception.Create('Cannot copy on itself');
+                    raise Exception.Create('Can''t copy on itself');
                 end;
                 {$endif}
                 Src := TFileStream.Create(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name, fmOpenRead);
@@ -1235,7 +1231,7 @@ begin
                     Speed := AllNumBytes / ((CurTime - StartTime) / 1000);
                   //if not UpdateProgress2(i + 1, AllNumBytes, 'Copy ' + FL[i].Name, FormatSize(AllNumBytes) + 'byte /' + AllBytesStr + 'byte with ' + FormatSize(Speed) + 'byte/s') then
                   if not PG2.UpdateValue2(i + 1, 'Copy ' + FL[i].Name, AllNumBytes, FormatSize(AllNumBytes) + 'byte / ' + AllBytesStr + 'byte with ' + FormatSize(Speed) + 'byte/s') then
-                    raise Exception.Create('copy stopped');
+                    raise Exception.Create('Copy stopped');
                   WrittenCount := Dest.Write(Buffer^, Count);
                   if WrittenCount <> Count then
                     raise Exception.Create('fail to write');
@@ -1267,7 +1263,7 @@ begin
           if NotCopied = 1 then
             ShowMessage('Error: ' + Msg)
           else
-            ShowMessage('Cannot copy ' + IntToStr(NotCopied) + ' files/dirs');
+            ShowMessage('Can''t copy ' + IntToStr(NotCopied) + ' files/dirs');
         end
         else
         begin
@@ -1275,6 +1271,253 @@ begin
             FFileList[i].Selected := False;
           CheckSelected;
         end;
+      end;
+    end;
+  finally
+    FL.Free;
+  end;
+end;
+
+//############ Copy
+procedure TFileList.MoveFiles(Target: string);
+const
+  BufferSize = 100 * 1024;
+var
+  FL: TEntryList;
+  dirs, Files, NotCopied, i, NumBytes, AllBytes: Integer;
+  Count,WrittenCount, AllNumBytes, SrcLock, DestLock, IsSame: LongInt;
+  Buffer: PByte;
+  Src, Dest: TFileStream;
+  AllBytesStr: String;
+  Msg, NewName: string;
+  StartTime, CurTime: LongWord;
+  Speed: Extended;
+  PG: TSingleProgress;
+  PG2: TDoubleProgress;
+  Size: Int64;
+  IsSameDevice: Boolean;
+begin
+  FL := TEntryList.Create;
+  try
+    PG := nil;
+    PG2 := nil;
+    Src := nil;
+    Dest := nil;
+    Buffer := nil;
+    dirs := 0;
+    Files := 0;
+    NotCopied := 0;
+    //check if we can use the shortcut move
+    {$ifdef HASAMIGA}
+    SrcLock := Lock(ExcludeTrailingPathDelimiter(FCurrentPath), SHARED_LOCK);
+    DestLock := Lock(ExcludeTrailingPathDelimiter(Target), SHARED_LOCK);
+    IsSameDevice := SameDevice(SrcLock, DestLock);
+    Unlock(SrcLock);
+    UnLock(DestLock);
+    {$endif}
+    if IsSameDevice then
+    begin
+      DoListOfSelectedFile(False, FL, dirs, files, Size);
+      if AskQuestion('Move ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files (' + Trim(FormatSize(Size))  + 'byte)? ') then
+      begin
+        PG := TSingleProgress.Create;
+        PG.Text := 'Mopy ';
+        PG.MaxValue := FL.Count;
+        PG.Execute;
+        for i := 0 to FL.Count - 1 do
+        begin
+          if FL[i].EType in [etDir, etFile] then
+          begin
+            PG.UpdateValue(i, FL[i].Name);
+            SysUtils.RenameFile(IncludeTrailingPathDelimiter(FCurrentPath) + ExcludeTrailingPathDelimiter(FL[i].Name), IncludeTrailingPathDelimiter(Target) + ExcludeTrailingPathDelimiter(FL[i].Name));
+          end;
+        end;
+        Update(True);
+      end;
+      Exit;
+    end;
+    FL.Clear;
+    // make a list of all
+    DoListOfSelectedFile(True, FL, dirs, files, Size);
+    if FL.Count > 0 then
+    begin
+      if AskQuestion('Move ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files (' + Trim(FormatSize(Size))  + 'byte)? ') then
+      begin
+        //---------- copy one file
+        if (FL.Count = 1) and (FL[0].EType = etFile) then
+        begin
+          PG := TSingleProgress.Create;
+          PG.Text := 'Mopy ';
+          PG.MaxValue := FL[0].Size;
+          PG.Execute;
+          //StartProgress('Copy ', FL[0].Size);
+          Buffer := AllocMem(BufferSize);
+          try
+            PG.UpdateValue(0, FL[0].Name);
+            //UpdateProgress(0, FL[0].Name);
+            // check if the same file
+            {$ifdef HASAMIGA}
+            if FileExists(IncludeTrailingPathDelimiter(Target) + FL[0].Name) then
+            begin
+              SrcLock := Lock(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name, SHARED_LOCK);
+              DestLock := Lock(IncludeTrailingPathDelimiter(Target) + FL[0].Name, SHARED_LOCK);
+              IsSame := SameLock(SrcLock, DestLock);
+              Unlock(SrcLock);
+              UnLock(DestLock);
+              if IsSame = LOCK_SAME then
+                raise Exception.Create('Can''t move  on itself');
+            end;
+            {$endif}
+            Src := TFileStream.Create(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name, fmOpenRead);
+            Dest := TFileStream.Create(IncludeTrailingPathDelimiter(Target) + FL[0].Name, fmCreate);
+            NumBytes := 0;
+            AllBytesStr := FormatSize(FL[0].Size);
+            {$WARNINGS OFF}
+            StartTime := GetTickCount;
+            {$WARNINGS ON}
+            repeat
+              Count := Src.Read(Buffer^, BufferSize);
+              NumBytes := NumBytes + Count;
+              {$WARNINGS OFF}
+              CurTime := GetTickCount;
+              {$WARNINGS ON}
+              Speed := 0.0;
+              if CurTime - StartTime > 0 then
+              begin
+                Speed := NumBytes / ((CurTime - StartTime) / 1000);
+              end;
+              if not PG.UpdateValue(NumBytes, 'Move file ' + FormatSize(NumBytes) + '/' + AllBytesStr + ' with ' + FormatSize(Speed) + 'byte/s') then
+                raise Exception.Create('Move stopped');
+              if Dest.Write(Buffer^, Count) <> Count then
+                raise Exception.Create('fail to write');
+            until Count = 0
+          except
+            on E:Exception do
+            begin
+              Src.Free;
+              Src := nil;
+              // only delete the file if the dest was created ;)
+              if Assigned(nil) then
+              begin
+                Dest.Free;
+                Dest := nil;
+                DeleteFile(IncludeTrailingPathDelimiter(Target) + ExtractFileName(FL[0].Name));
+              end;
+              NotCopied := 1;
+              Msg := E.Message;
+            end;
+          end;
+          PG.Free;
+          Src.Free;
+          Dest.Free;
+          FreeMem(Buffer);
+        end
+        else
+        begin //------------- Copy multiple files
+          AllBytes := 0;
+          AllNumBytes := 0;
+          for i := 0 to FL.Count - 1 do
+          begin
+            if FL[i].EType = etFile then
+              AllBytes := AllBytes + FL[i].Size;
+          end;
+          PG2 := TDoubleProgress.Create;
+          PG2.Text := 'Move';
+          PG2.Text2 := '';
+          PG2.MaxValue := FL.Count;
+          PG2.MaxValue2 := AllBytes;
+          PG2.Execute;
+          //
+          Buffer := AllocMem(BufferSize);
+          AllBytesStr := FormatSize(AllBytes);
+          {$WARNINGS OFF}
+          StartTime := GetTickCount;
+          {$WARNINGS ON}
+          for i := 0 to FL.Count - 1 do
+          begin
+            Src := nil;
+            Dest := nil;
+            try
+              if not PG2.UpdateValue2(i + 1, 'Move ' + FL[i].Name, AllNumBytes, FormatSize(AllNumBytes) + 'byte / ' + AllBytesStr + 'byte') then
+              begin
+                ShowMessage('Move stopped.');
+                NotCopied := 0;
+                Break;
+              end;
+              NewName := IncludeTrailingPathDelimiter(Target) + FL[i].Name;
+              if FL[i].EType = etDir then
+              begin
+                if not DirectoryExists(ExcludeTrailingPathDelimiter(NewName)) then
+                  CreateDir(ExcludeTrailingPathDelimiter(NewName));
+              end;
+              if FL[i].EType = etFile then
+              begin
+                {$ifdef HASAMIGA}
+                if FileExists(IncludeTrailingPathDelimiter(Target) + FL[0].Name) then
+                begin
+                  SrcLock := Lock(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name, SHARED_LOCK);
+                  DestLock := Lock(NewName, SHARED_LOCK);
+                  IsSame := SameLock(SrcLock, DestLock);
+                  Unlock(SrcLock);
+                  UnLock(DestLock);
+                  if IsSame = LOCK_SAME then
+                    raise Exception.Create('Can''t move on itself');
+                end;
+                {$endif}
+                Src := TFileStream.Create(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name, fmOpenRead);
+                Dest := TFileStream.Create(NewName, fmCreate);
+                repeat
+                  Count := Src.Read(Buffer^, BufferSize);
+                  if Count = 0 then
+                    Break;
+                  AllNumBytes := AllNumBytes + Count;
+                  {$WARNINGS OFF}
+                  CurTime := GetTickCount;
+                  {$WARNINGS ON}
+                  Speed := 0.0;
+                  if CurTime - StartTime > 0 then
+                    Speed := AllNumBytes / ((CurTime - StartTime) / 1000);
+                  if not PG2.UpdateValue2(i + 1, 'Copy ' + FL[i].Name, AllNumBytes, FormatSize(AllNumBytes) + 'byte / ' + AllBytesStr + 'byte with ' + FormatSize(Speed) + 'byte/s') then
+                    raise Exception.Create('Move stopped');
+                  WrittenCount := Dest.Write(Buffer^, Count);
+                  if WrittenCount <> Count then
+                    raise Exception.Create('fail to write');
+                until Count = 0;
+                Src.Free;
+                Src := nil;
+                Dest.Free;
+                Dest := nil;
+              end;
+            except
+              on E:Exception do
+              begin
+                Src.Free;
+                Src := nil;
+                Dest.Free;
+                Dest := nil;
+                DeleteFile(IncludeTrailingPathDelimiter(Target) + ExtractFileName(FL[0].Name));
+                NotCopied := 1;
+                Msg := E.Message;
+                Break;
+              end;
+            end;
+          end;
+          PG2.Free;
+          FreeMem(Buffer);
+        end;
+        if NotCopied > 0 then
+        begin
+          if NotCopied = 1 then
+            ShowMessage('Error: ' + Msg)
+          else
+            ShowMessage('Can''t move ' + IntToStr(NotCopied) + ' files/dirs');
+        end
+        else
+        begin
+          for i := FL.Count - 1 downto 0 do
+            DeleteFile(IncludeTrailingPathDelimiter(FCurrentPath) + ExcludeTrailingPathDelimiter(FL[i].Name));
+        end;
+        Update(True);
       end;
     end;
   finally
