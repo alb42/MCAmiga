@@ -123,6 +123,7 @@ function AskQuestion(AText: string): Boolean; // yes = true
 function AskForName(AText: string; var ANewName: string; UseAsName: Boolean = True): Boolean;
 
 procedure ShowHelp;
+procedure ShowViewHelp;
 procedure ShowMessage(AText: string);
 procedure NonWaitMessage(AText: string);
 
@@ -135,23 +136,42 @@ const       //.........1.........2.........3.........4.........5........6.......
   HelpText = '        MyCommander Amiga Version 0.2       '#13#10 +
              '        =============================        '#13#10 +
              ' F1  - Help              Ins  - Select File'#13#10 +
-             ' F5  - Copy Files        +    - Select by pattern'#13#10 +
-             ' F6  - Move Files        -    - Deselect by pattern'#13#10 +
-             ' F7  - Create Directory  TAB  - Switch Focus'#13#10 +
-             ' F8  - Delete Files      Alt F1/F2 - Show Drives'#13#10 +
-             ' F10 - Quit Program      Backspace - Parent'#13#10 +
-             ' '#13#10 +
-             ' Shift + Enter - Open Dir in other side'#13#10 +
+             ' F3  - View              +    - Select by pattern'#13#10 +
+             ' F4  - Edit              -    - Deselect by pattern'#13#10 +
+             ' F5  - Copy              TAB  - Switch Focus'#13#10 +
+             ' F6  - Move              Alt F1/F2 - Show Drives'#13#10 +
+             ' F7  - Create Directory  Backspace - Parent'#13#10 +
+             ' F8  - Delete Files      Shift + Enter - Open Dir in other side'#13#10 +
+             ' F10/ESC - Quit Program'#13#10 +
              ' Ctrl + R - Rescan Directory'#13#10 +
              ' Ctrl + O - Set Destination Directory to Source Directory'#13#10 +
              ' Ctrl + S - type to find entry in current directory'#13#10 +
              '';
+
+  const       //.........1.........2.........3.........4.........5........6.........7
+  HelpViewText = '       Editor Help       '#13#10 +
+                 ' F1  - Help'#13#10 +
+                 ' F4  - Toggle ASCII and Hex View '#13#10 +
+                 ' F10/ESC - Leave Viewer'#13#10 +
+                 ' Cursor Keys(4,6,8,2) Pg Up(9), Pg Down(3),'#13#10 +
+                 '    Home(7), End(1) - navigate in Text'#13#10 +
+                 ' '#13#10 + '';
 
 procedure ShowHelp;
 begin
   with TShowMessage.Create do
   begin
     Text := HelpText;
+    Execute;
+    Free;
+  end;
+end;
+
+procedure ShowViewHelp;
+begin
+  with TShowMessage.Create do
+  begin
+    Text := HelpViewText;
     Execute;
     Free;
   end;

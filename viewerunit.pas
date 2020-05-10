@@ -16,7 +16,7 @@ procedure FileViewer(AFileName: string);
 implementation
 
 uses
-  FileListUnit;
+  FileListUnit, DialogUnit;
 
 type
   TViewerMode = (vmText, vmHex);
@@ -70,6 +70,28 @@ begin
   end;
 end;
 
+procedure ConvertChar(var c: Char); inline;
+begin
+  case c of
+    #$C7: c := #128; // C
+    #$FC: c := #129; // ue
+    #$DC: c := #154; // UE
+    #$E4: c := #132; // ae
+    #$C4: c := #142; // AE
+    #$F6: c := #148; // oe
+    #$D6: c := #153; // OE
+    #$DF: c := #225; // sz
+  end;
+end;
+
+procedure ConvertText(var s: string);
+var
+  i: Integer;
+begin
+  for i := 1 to Length(s) do
+    ConvertChar(s[i]);
+end;
+
 procedure TFileViewer.FormatText;
 var
   i, p: Integer;
@@ -80,7 +102,8 @@ begin
   i := 0;
   while i < ShownText.Count do
   begin
-    s := ShownText[i];
+    s := StringReplace(ShownText[i], #9, '  ', [rfReplaceAll]);
+    ConvertText(s);
     if Length(s) > ScreenWidth then
     begin
       P := LastDelimiter(' ', Copy(s, 1, ScreenWidth));
@@ -89,7 +112,9 @@ begin
       ShownText[i] := Copy(s, 1, p);
       Delete(s, 1, p);
       ShownText.Insert(i + 1, s);
-    end;
+    end
+    else
+      ShownText[i] := s;
     Inc(i);
   end;
 end;
@@ -356,6 +381,7 @@ begin
           CurrentByte := NumBytes - 1;
       end;
       kbdF10: Break;
+      kbdF1: begin ShowViewHelp; Paint; end;
       kbdF4: SwitchMode;
     end;
     Sleep(25);
