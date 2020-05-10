@@ -51,6 +51,15 @@ type
     function Execute: Integer; override; // returns the number of the Button pressed
   end;
 
+  { TNonWaitMessage }
+
+  TNonWaitMessage = class(TShowMessage)
+  protected
+    procedure DrawButtons; override;
+  public
+    function Execute: Integer; override;
+  end;
+
   { TAskQuestion }
 
   TAskQuestion = class(TShowMessage)
@@ -115,6 +124,7 @@ function AskForName(AText: string; var ANewName: string; UseAsName: Boolean = Tr
 
 procedure ShowHelp;
 procedure ShowMessage(AText: string);
+procedure NonWaitMessage(AText: string);
 
 implementation
 
@@ -157,6 +167,16 @@ begin
   end;
 end;
 
+procedure NonWaitMessage(AText: string);
+begin
+  with TNonWaitMessage.Create do
+  begin
+    Text := AText;
+    Execute;
+    Free;
+  end;
+end;
+
 function AskQuestion(AText: string): Boolean;
 begin
   with TAskQuestion.Create do
@@ -180,6 +200,19 @@ begin
       ANewName := NewName;
     Free;
   end;
+end;
+
+{ TNonWaitMessage }
+
+procedure TNonWaitMessage.DrawButtons;
+begin
+  // No button here ;)
+end;
+
+function TNonWaitMessage.Execute: Integer;
+begin
+  Result := 0;
+  Paint;
 end;
 
 { TDoubleProgress }

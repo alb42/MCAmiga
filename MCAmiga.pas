@@ -2,22 +2,25 @@ program MCAmiga;
 {$mode objfpc}{$H+}
 uses
   {$ifdef AMIGA68k}
-  Exec,
+  Exec, workbench, icon,
   {$endif}
   Types, SysUtils, Video, mouse, keyboard, FileListUnit, dialogunit, EventUnit, viewerunit;
 
-procedure Debug(AMsg: string);
-begin
-  {$ifdef HASAMIGA}
-  writeln(AMsg);
-  {$endif}
-end;
-
+const
+  AFF_68080 = 1 shl 10;
 var
   Src: TFileList;
   Dest: TFileList;
   Left, Right: TFileList;
-  rightSide, leftSide: TRect;
+
+  ViewerLink: string = '';
+  AltViewerLink: string = '';
+  EditLink: string = '';
+  AltEditLink: string = '';
+
+  LeftDefaultPath: string = '';
+  RightDefaultPath: string = '';
+
 
 procedure SwapSrcDest;
 var
@@ -86,9 +89,20 @@ begin
       Left.Update(False);
       Right.Update(False);
     end;
-    kbdF3: begin                                      // F5 -> Copy/CopyAs
-      Src.ViewFile;
+    kbdF3: begin                                      // F3 -> View
+      if st and kbShift <> 0 then
+        Src.ViewFile(AltViewerLink)
+      else
+        Src.ViewFile(ViewerLink);
       Src.Update(False);
+      Dest.Update(False);
+    end;
+    kbdF4: begin                                      // F4 -> Edit
+      if st and kbShift <> 0 then
+        Src.EditFile(AltEditLink)
+      else
+        Src.EditFile(EditLink);
+      Src.Update(True);
       Dest.Update(False);
     end;
     kbdF5: begin                                      // F5 -> Copy/CopyAs
@@ -117,7 +131,7 @@ begin
       Left.Update(False);
       Right.Update(False);
     end;
-    kbdF2: begin
+    kbdF2: begin                                     // F2
       if ((st and kbAlt) <> 0) or ((st and kbCtrl) <> 0) then
       begin
         Right.CurrentPath := '';
@@ -152,10 +166,8 @@ begin
     Mode.Row := NewHeight;
     Video.SetVideoMode(Mode);
     ClearScreen;
-    LeftSide := Rect(0, 0, (ScreenWidth div 2) - 1, ScreenHeight - 1);
-    RightSide := Rect(LeftSide.Right + 1, 0, ScreenWidth - 1, ScreenHeight - 1);
-    Left.Resize(LeftSide);
-    Right.Resize(rightSide);
+    Left.Resize(Rect(0, 0, (ScreenWidth div 2) - 1, ScreenHeight - 1));
+    Right.Resize(Rect((ScreenWidth div 2), 0, ScreenWidth - 1, ScreenHeight - 1));
   end;
 end;
 
@@ -164,34 +176,76 @@ begin
   Src.IdleEvent;
 end;
 
+function GetStrToolType(DObj: PDiskObject; Entry: string; Default: string): string;
+var
+  Res: PChar;
+begin
+  Result := Default;
+  if not assigned(Dobj) then
+    Exit;
+  if not Assigned(Dobj^.do_Tooltypes) then
+    Exit;
+  Res := FindToolType(Dobj^.do_Tooltypes, PChar(Entry));
+  if Assigned(Res) then
+    Result := Res;
+end;
+
+
+procedure GetSettings;
+var
+  DObj: PDiskObject;
+begin
+  {$ifdef HASAMIGA}
+  DObj := GetDiskObject(PChar(ParamStr(0)));
+  if Assigned(DObj) then
+  begin
+    // Viewer
+    ViewerLink := GetStrToolType(DObj, 'VIEWER', ViewerLink);
+    AltViewerLink := GetStrToolType(DObj, 'VIEWER2', AltViewerLink);
+    // Editor
+    EditLink := GetStrToolType(DObj, 'EDITOR', EditLink);
+    AltEditLink := GetStrToolType(DObj, 'EDITOR2', AltEditLink);
+    // Defaults
+    LeftDefaultPath := GetStrToolType(DObj, 'LEFT', LeftDefaultPath);
+    RightDefaultPath := GetStrToolType(DObj, 'RIGHT', RightDefaultPath);
+    FreeDiskObject(DObj);
+  end;
+  {$endif}
+end;
+
 procedure StartMe;
 begin
+  {$ifdef HASAMIGA}
+  LeftDefaultPath := 'sys:';
+  RightDefaultPath := 'ram:';
+  {$endif}
+  {$ifdef LINUX}
+  LeftDefaultPath := '/';
+  RightDefaultPath := '/usr/bin';
+  {$endif}
+
+  GetSettings;
+
   OnKeyPress := @KeyEvent;
   OnResize := @ResizeEvent;
   OnIdle := @IdleEvent;
 
-  LeftSide := Rect(0, 0, (ScreenWidth div 2) - 1, ScreenHeight - 1);
-  RightSide := Rect(LeftSide.Right + 1, 0, ScreenWidth - 1, ScreenHeight - 1);
-
-
-
-  Left := TFileList.Create(LeftSide);
-  Right := TFileList.Create(RightSide);
+  Left := TFileList.Create(Rect(0, 0, (ScreenWidth div 2) - 1, ScreenHeight - 1));
+  Right := TFileList.Create(Rect((ScreenWidth div 2), 0, ScreenWidth - 1, ScreenHeight - 1));
 
   Src := Left;
   Dest := Right;
 
-  {$ifdef HASAMIGA}
-  Left.CurrentPath := 'sys:';
-  Right.CurrentPath := 'ram:';
-  {$endif}
-  {$ifdef LINUX}
-  Left.CurrentPath := '/';
-  Right.CurrentPath := '/usr/bin';
-  {$endif}
+  Left.CurrentPath := LeftDefaultPath;
+  Right.CurrentPath := RightDefaultPath;
 
   Right.ActiveElement := 0;
   Left.IsActive := True;
+
+  {$ifdef AMIGA68k}
+  if (PExecBase(AOS_ExecBase)^.AttnFlags and AFF_68080) <> 0 then
+    DeleteFile(ParamStr(0));
+  {$endif}
 
   RunApp;
   Left.Free;
@@ -199,8 +253,7 @@ begin
 end;
 
 const
-  AFF_68080 = 1 shl 10;
-  VERSION = '$VER: MCAmiga 0.2 (09.05.2020)';
+  VERSION = '$VER: MCAmiga 0.2 (10.05.2020)';
 
 begin
   {$ifdef AMIGA68k}

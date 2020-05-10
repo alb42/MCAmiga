@@ -111,7 +111,8 @@ type
     procedure IdleEvent;
     procedure SearchList;
 
-    procedure ViewFile;
+    procedure ViewFile(OpenWithProgram: string = '');
+    procedure EditFile(OpenWithProgram: string = '');
 
     procedure SelectByPattern(DoSelect: Boolean);
 
@@ -510,7 +511,7 @@ begin
     end
     else
     case FFileList[Idx].EType of
-      etFile: col := Green;
+      etFile: col := Cyan;
       etDir:    col := White;
       etParent: col := LightGray;
       etDrive:  col := White;
@@ -1046,13 +1047,49 @@ begin
   DrawActive(FActiveElement);
 end;
 
-procedure TFileList.ViewFile;
+procedure TFileList.ViewFile(OpenWithProgram: string = '');
+var
+  FileN: string;
+  Ret: Integer;
 begin
   if InRange(FActiveElement, 0, FFileList.Count - 1) then
   begin
     if FFileList[FActiveElement].EType = etFile then
     begin
-      FileViewer(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name);
+      FileN := IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name;
+      if OpenWithProgram = '' then
+        FileViewer(FileN)
+      else
+      begin
+        NonWaitMessage('Starting ' + ExtractFileName(OpenWithProgram));
+        Ret := ExecuteProcess(OpenWithProgram, [FileN]);
+        if Ret <> 0 then
+          ShowMessage(OpenWithProgram + ' returned with error message: ' + IntToStr(Ret));
+      end;
+    end;
+  end;
+end;
+
+procedure TFileList.EditFile(OpenWithProgram: string = '');
+var
+  FileN: string;
+  Ret: Integer;
+begin
+  if InRange(FActiveElement, 0, FFileList.Count - 1) then
+  begin
+    if FFileList[FActiveElement].EType = etFile then
+    begin
+      FileN := IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name;
+      if OpenWithProgram = '' then
+        ShowMessage('No Editor set')
+      else
+      begin
+        // message without waiting
+        NonWaitMessage('Starting ' + ExtractFileName(OpenWithProgram));
+        Ret := ExecuteProcess(OpenWithProgram, [FileN]);
+        if Ret <> 0 then
+          ShowMessage(OpenWithProgram + ' returned with error message: ' + IntToStr(Ret));
+      end;
     end;
   end;
 end;
