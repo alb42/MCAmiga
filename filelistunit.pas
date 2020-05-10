@@ -6,7 +6,7 @@ interface
 
 uses
   {$ifdef HASAMIGA}
-  AmigaDOS,
+  AmigaDOS, Exec,
   {$endif}
   Video, Keyboard, Classes, SysUtils, Math, fgl, StrUtils;
 
@@ -111,6 +111,8 @@ type
     procedure IdleEvent;
     procedure SearchList;
 
+    procedure ViewFile;
+
     procedure SelectByPattern(DoSelect: Boolean);
 
     property CurrentPath: string read FCurrentPath write SetCurrentPath;
@@ -129,7 +131,7 @@ type
 implementation
 
 uses
-  DialogUnit, EventUnit;
+  DialogUnit, EventUnit, ViewerUnit;
 
 function LimitName(AName: string; MaxLength: Integer; PathMode: Boolean = False): string;
 var
@@ -325,6 +327,11 @@ begin
     SetText(FRect.Left + 2, FRect.Top, LeftEdge + s + RightEdge);
   CheckSelected;
 end;
+
+{$ifdef AmigaOS4}
+const
+  DLT_DIRECTORY = DLT_LOCK;
+{$endif}
 
 procedure TFileList.DrawContents(UpdateList: Boolean);
 var
@@ -1039,6 +1046,17 @@ begin
   DrawActive(FActiveElement);
 end;
 
+procedure TFileList.ViewFile;
+begin
+  if InRange(FActiveElement, 0, FFileList.Count - 1) then
+  begin
+    if FFileList[FActiveElement].EType = etFile then
+    begin
+      FileViewer(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name);
+    end;
+  end;
+end;
+
 procedure TFileList.SelectByPattern(DoSelect: Boolean);
 var
   s, Pattern: string;
@@ -1070,7 +1088,10 @@ const
 var
   FL: TEntryList;
   dirs, Files, NotCopied, i, NumBytes, AllBytes: Integer;
-  Count,WrittenCount, AllNumBytes, SrcLock, DestLock, IsSame: LongInt;
+  Count,WrittenCount, AllNumBytes, IsSame: LongInt;
+  {$ifdef HASAMIGA}
+  SrcLock, DestLock: BPTR;
+  {$endif}
   Buffer: PByte;
   Src, Dest: TFileStream;
   AllBytesStr: String;
@@ -1111,8 +1132,8 @@ begin
             {$ifdef HASAMIGA}
             if FileExists(IncludeTrailingPathDelimiter(Target) + FL[0].Name) then
             begin
-              SrcLock := Lock(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name, SHARED_LOCK);
-              DestLock := Lock(IncludeTrailingPathDelimiter(Target) + FL[0].Name, SHARED_LOCK);
+              SrcLock := Lock(PChar(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name), SHARED_LOCK);
+              DestLock := Lock(PChar(IncludeTrailingPathDelimiter(Target) + FL[0].Name), SHARED_LOCK);
               IsSame := SameLock(SrcLock, DestLock);
               Unlock(SrcLock);
               UnLock(DestLock);
@@ -1207,8 +1228,8 @@ begin
                 {$ifdef HASAMIGA}
                 if FileExists(IncludeTrailingPathDelimiter(Target) + FL[0].Name) then
                 begin
-                  SrcLock := Lock(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name, SHARED_LOCK);
-                  DestLock := Lock(NewName, SHARED_LOCK);
+                  SrcLock := Lock(PChar(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name), SHARED_LOCK);
+                  DestLock := Lock(PChar(NewName), SHARED_LOCK);
                   IsSame := SameLock(SrcLock, DestLock);
                   Unlock(SrcLock);
                   UnLock(DestLock);
@@ -1285,7 +1306,10 @@ const
 var
   FL: TEntryList;
   dirs, Files, NotCopied, i, NumBytes, AllBytes: Integer;
-  Count,WrittenCount, AllNumBytes, SrcLock, DestLock, IsSame: LongInt;
+  Count,WrittenCount, AllNumBytes, IsSame: LongInt;
+  {$ifdef HASAMIGA}
+  SrcLock, DestLock: BPTR;
+  {$endif}
   Buffer: PByte;
   Src, Dest: TFileStream;
   AllBytesStr: String;
@@ -1307,10 +1331,11 @@ begin
     dirs := 0;
     Files := 0;
     NotCopied := 0;
+    IsSameDevice := False;
     //check if we can use the shortcut move
     {$ifdef HASAMIGA}
-    SrcLock := Lock(ExcludeTrailingPathDelimiter(FCurrentPath), SHARED_LOCK);
-    DestLock := Lock(ExcludeTrailingPathDelimiter(Target), SHARED_LOCK);
+    SrcLock := Lock(PChar(ExcludeTrailingPathDelimiter(FCurrentPath)), SHARED_LOCK);
+    DestLock := Lock(PChar(ExcludeTrailingPathDelimiter(Target)), SHARED_LOCK);
     IsSameDevice := SameDevice(SrcLock, DestLock);
     Unlock(SrcLock);
     UnLock(DestLock);
@@ -1359,8 +1384,8 @@ begin
             {$ifdef HASAMIGA}
             if FileExists(IncludeTrailingPathDelimiter(Target) + FL[0].Name) then
             begin
-              SrcLock := Lock(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name, SHARED_LOCK);
-              DestLock := Lock(IncludeTrailingPathDelimiter(Target) + FL[0].Name, SHARED_LOCK);
+              SrcLock := Lock(PChar(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name), SHARED_LOCK);
+              DestLock := Lock(PChar(IncludeTrailingPathDelimiter(Target) + FL[0].Name), SHARED_LOCK);
               IsSame := SameLock(SrcLock, DestLock);
               Unlock(SrcLock);
               UnLock(DestLock);
@@ -1455,8 +1480,8 @@ begin
                 {$ifdef HASAMIGA}
                 if FileExists(IncludeTrailingPathDelimiter(Target) + FL[0].Name) then
                 begin
-                  SrcLock := Lock(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name, SHARED_LOCK);
-                  DestLock := Lock(NewName, SHARED_LOCK);
+                  SrcLock := Lock(PChar(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name), SHARED_LOCK);
+                  DestLock := Lock(PChar(NewName), SHARED_LOCK);
                   IsSame := SameLock(SrcLock, DestLock);
                   Unlock(SrcLock);
                   UnLock(DestLock);

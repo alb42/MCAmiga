@@ -1,9 +1,10 @@
 program MCAmiga;
+{$mode objfpc}{$H+}
 uses
   {$ifdef AMIGA68k}
   Exec,
   {$endif}
-  Types, SysUtils, Video, mouse, keyboard, FileListUnit, dialogunit, EventUnit;
+  Types, SysUtils, Video, mouse, keyboard, FileListUnit, dialogunit, EventUnit, viewerunit;
 
 procedure Debug(AMsg: string);
 begin
@@ -85,6 +86,11 @@ begin
       Left.Update(False);
       Right.Update(False);
     end;
+    kbdF3: begin                                      // F5 -> Copy/CopyAs
+      Src.ViewFile;
+      Src.Update(False);
+      Dest.Update(False);
+    end;
     kbdF5: begin                                      // F5 -> Copy/CopyAs
       Src.CopyFiles(Dest.CurrentPath);
       Src.Update(False);
@@ -130,7 +136,7 @@ begin
       end;
     end
     else
-      Debug('Key: $' + HexStr(TranslateKeyEvent(Ev), 4));
+    //  Debug('Key: $' + HexStr(TranslateKeyEvent(Ev), 4));
   end;
 end;
 
@@ -194,6 +200,7 @@ end;
 
 const
   AFF_68080 = 1 shl 10;
+  VERSION = '$VER: MCAmiga 0.2 (09.05.2020)';
 
 begin
   {$ifdef AMIGA68k}
@@ -207,7 +214,7 @@ begin
   InitMouse;
   InitKeyboard;
   {$ifdef HASAMIGA}
-  Video.SetWindowTitle('MyCommander Amiga 0.1', 'My Commander Amiga');
+  Video.SetWindowTitle('MyCommander Amiga 0.2', VERSION);
   {$endif}
 
   StartMe;

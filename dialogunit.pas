@@ -122,7 +122,7 @@ uses
   FileListUnit;
 
 const       //.........1.........2.........3.........4.........5........6.........7
-  HelpText = '        MyCommander Amiga Version 0.1       '#13#10 +
+  HelpText = '        MyCommander Amiga Version 0.2       '#13#10 +
              '        =============================        '#13#10 +
              ' F1  - Help              Ins  - Select File'#13#10 +
              ' F5  - Copy Files        +    - Select by pattern'#13#10 +
@@ -134,6 +134,7 @@ const       //.........1.........2.........3.........4.........5........6.......
              ' Shift + Enter - Open Dir in other side'#13#10 +
              ' Ctrl + R - Rescan Directory'#13#10 +
              ' Ctrl + O - Set Destination Directory to Source Directory'#13#10 +
+             ' Ctrl + S - type to find entry in current directory'#13#10 +
              '';
 
 procedure ShowHelp;
@@ -450,7 +451,7 @@ begin
       end;
       $011B: begin
         Result := 1;
-        Exit;
+        Break;
       end;
       $0F09: begin
         YesActive := not YesActive;

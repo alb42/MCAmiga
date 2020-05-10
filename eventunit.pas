@@ -68,6 +68,10 @@ begin
     try
       OnKeyPress(ev);
     except
+      on e: Exception do
+      begin
+        writeln('Exception: ', e.message);
+      end;
     end;
   end;
 end;
