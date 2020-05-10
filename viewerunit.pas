@@ -444,11 +444,16 @@ begin
       Pl2 := Pl;
       for j := 1 to High(sa) do
       begin
+        if AbsOffset + 1 > NumBytes then
+        begin
+          Found := False;
+          Break;
+        end;
         if Pl2^ <> sa[j] then
           Found := False;
         if not Found then
           Break;
-        Inc(PL2);
+        Inc(Pl2);
       end;
       if Found then
       begin
@@ -464,6 +469,8 @@ procedure TFileViewer.SearchText;
 var
   SearchString: string;
 begin
+  FromSel := Point(-1,-1);
+  ToSel := Point(-1,-1);
   SearchString := '';
   if AskForName('Search for text ', SearchString, False) then
   begin
