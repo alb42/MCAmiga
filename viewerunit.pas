@@ -30,6 +30,7 @@ type
     Num4BytesPerLine: LongWord;
     NumBytesPerLine: LongWord;
     FCurrentByte: LongWord;
+    FUntilByte: LongWord;
     Mode: TViewerMode;
     FileName: string;
     FStartLine: Integer;
@@ -41,6 +42,19 @@ type
     procedure SetCurrentByte(AValue: LongWord);
     procedure SetStartLine(AValue: Integer);
     procedure SwitchMode;
+    procedure GoToLineNumber;
+
+  private
+    LastBinSearch: string;
+    procedure SearchBinary;
+    procedure FindBinary(SearchString: string; FromWhere: Integer);
+  private
+    SelectStart: LongWord;
+    SelectEnd: LongWord;
+    FromSel, ToSel: TPoint;
+    LastTextSearch: string;
+    procedure SearchText;
+    procedure FindText(SearchString: string; FromWhere: TPoint);
   public
     constructor Create;
     destructor Destroy; override;
@@ -87,9 +101,14 @@ end;
 procedure ConvertText(var s: string);
 var
   i: Integer;
+  c: Char;
 begin
   for i := 1 to Length(s) do
-    ConvertChar(s[i]);
+  begin
+    c := s[i];
+    ConvertChar(c);
+    s[i] := c;
+  end;
 end;
 
 procedure TFileViewer.FormatText;
@@ -121,10 +140,19 @@ end;
 
 procedure TFileViewer.Paint;
 var
-  i, l,  cx: Integer;
+  i, l,  cx, l1: Integer;
   j, StartByte, cb, OffsetForChars, EndOfDisplay: LongWord;
-  s: String;
+  s, s1, s2: String;
   pl: PByte;
+
+  function IsByteSelected(Num: LongWord): Boolean;
+  begin
+    if FUntilByte = 0 then
+      Result := Num = FCurrentByte
+    else
+      Result := InRange(Num, FCurrentByte, FUntilByte);
+  end;
+
 begin
   // draw
   BGPen := Cyan;
@@ -147,11 +175,28 @@ begin
     FGPen := White;
     for i := 0 to ScreenHeight - 2 do
     begin
+      s := ShownText[i + StartLine];
+      l := Length(s);
       if i + StartLine < ShownText.Count then
       begin
-        s := ShownText[i + StartLine];
-        l := Length(s);
-        SetText(0, i + 1, s);
+        if InRange(i + StartLine, FromSel.Y, ToSel.Y) then
+        begin
+          s1 := s;
+          s2 := Copy(s1, 1, FromSel.X - 1);
+          l1 := Length(s2);
+          SetText(0, i + 1, s2);
+          BGPen := Cyan;
+          s2 := Copy(s1, FromSel.X, ToSel.X - FromSel.X);
+          Delete(s1, 1, ToSel.X - 1);
+          SetText(l1, i + 1, s2);
+          l1 := l1 + Length(s2);
+          BGPen := Blue;
+          SetText(l1, i + 1, s1);
+        end
+        else
+        begin
+          SetText(0, i + 1, s);
+        end;
       end
       else
         l := 0;
@@ -193,13 +238,13 @@ begin
           if cb + j < NumBytes then
           begin
             s := HexStr(pl^, 2);
-            if CurrentByte = (cb + j) then
+            if IsByteSelected(cb + j) then
               BGPen := Cyan;
             SetText(cx, i + 1, s);
             BGPen := Blue;
             SetText(cx + 2, i + 1, ' ');
             Inc(cx, 3);
-            if CurrentByte = (cb + j) then
+            if IsByteSelected(cb + j) then
               BGPen := Cyan;
             if InRange(pl^, 32, 126) then
               SetChar(OffsetForChars + j, i + 1, Char(Pl^))
@@ -307,12 +352,170 @@ begin
   end;
 end;
 
+procedure TFileViewer.GoToLineNumber;
+var
+  NewLine: Integer;
+begin
+  if Mode = vmText then
+  begin
+    NewLine := 1;
+    if AskForNumber('Goto line (1 to ' + IntToStr(ShownText.Count)  +')', NewLine) then
+      StartLine := NewLine - 1
+    else
+      Paint;
+  end
+  else
+  if Mode = vmHex then
+  begin
+    if AskForNumber('Goto offset (0 to ' + IntToStr(NumBytes - 1)  +')', NewLine) then
+      CurrentByte := NewLine
+    else
+      Paint;
+  end;
+end;
+
+procedure TFileViewer.SearchBinary;
+var
+  SearchString: string;
+  Pl: PByte;
+begin
+  Pl := Buffer;
+  Inc(PL, CurrentByte);
+  SearchString := '';//HexStr(PL^, 2);
+  if AskForHexNumber('Search for binary, Hex (0..9,A..F) ', SearchString) then
+  begin
+    SearchString := StringReplace(UpperCase(SearchString), ' ', '', [rfReplaceAll]);
+    LastBinSearch := SearchString;
+    FindBinary(SearchString, 0);
+  end;
+
+  Paint;
+end;
+
+procedure TFileViewer.FindBinary(SearchString: string; FromWhere: Integer);
+var
+  Pl, Pl2: PByte;
+  s: string;
+  Sa: array of Byte;
+  Idx, i, j: Integer;
+  Offset: SizeInt;
+  AbsOffset: LongWord;
+  Found: Boolean;
+begin
+  SetLength(sa, 10);
+  Idx := 0;
+  while Length(Searchstring) > 0 do
+  begin
+    s := Copy(SearchString, 1, 2);
+    Delete(SearchString, 1, 2);
+    if TryStrToInt('$' + s, i) then
+    begin
+      sa[Idx] := i;
+      Inc(Idx);
+      if Idx > High(sa) then
+        SetLength(sa, Idx + 10);
+    end
+    else
+    begin
+      Showmessage('Illegal Hex number $' + s);
+      Paint;
+      Exit;
+    end;
+  end;
+  // the actual search
+  if Idx > 0 then
+  begin
+    SetLength(sa, Idx);
+    PL := Buffer;
+    Inc(Pl, FromWhere);
+    AbsOffset := FromWhere;
+    repeat
+      Offset := IndexByte(PL^, NumBytes - FromWhere, sa[0]);
+      if Offset < 0 then
+      begin
+        ShowMessage('No more entries found.');
+        Paint;
+        Exit;
+      end;
+      // found!
+      Inc(Pl, Offset + 1);
+      AbsOffset := AbsOffset + Offset + 1;
+      Found := True;
+      Pl2 := Pl;
+      for j := 1 to High(sa) do
+      begin
+        if Pl2^ <> sa[j] then
+          Found := False;
+        if not Found then
+          Break;
+        Inc(PL2);
+      end;
+      if Found then
+      begin
+        FUntilByte := Min(NumBytes, Int64(AbsOffset - 1) + Length(sa)) - 1;
+        CurrentByte := AbsOffset - 1;
+        Break;
+      end;
+    until False;
+  end;
+end;
+
+procedure TFileViewer.SearchText;
+var
+  SearchString: string;
+begin
+  SearchString := '';
+  if AskForName('Search for text ', SearchString, False) then
+  begin
+    LastTextSearch := SearchString;
+    FindText(SearchString, Point(0, 0));
+  end;
+  Paint;
+end;
+
+
+procedure TFileViewer.FindText(SearchString: string; FromWhere: TPoint);
+var
+  x, i, p: Integer;
+  s: string;
+  Found: Boolean;
+begin
+  FromSel := Point(-1,-1);
+  ToSel := Point(-1,-1);
+  Found := False;
+  for i := FromWhere.Y to ShownText.Count - 1 do
+  begin
+    s := ShownText[i];
+    if i = FromWhere.Y then
+      for x := 1 to FromWhere.X - 1 do
+        s[x] := #0;
+    p := Pos(SearchString, s);
+    Found := p > 0;
+    if Found then
+    begin
+      FromSel := Point(p, i);
+      ToSel := Point(P + Length(SearchString), i);
+      if FStartLine < FromSel.Y then
+        StartLine := FromSel.Y;
+      if FStartLine + (ScreenHeight - 1) < ToSel.Y then
+        StartLine := ToSel.Y - (ScreenHeight - 1);
+      Break;
+    end;
+  end;
+  if not Found then
+    ShowMessage('No more entries found.');
+  Paint
+end;
+
 constructor TFileViewer.Create;
 begin
   OrigText := TStringList.Create;
   ShownText := TStringList.Create;
   Mode := vmText;
   NumBytesPerLine := 16;
+  FUntilByte := 0;
+  FromSel := Point(-1, -1);
+  ToSel := Point(-1, -1);
 end;
 
 destructor TFileViewer.Destroy;
@@ -327,6 +530,7 @@ end;
 procedure TFileViewer.Execute(AFilename: string);
 var
   Key: TKeyEvent;
+  st: Byte;
 begin
   FileName := AFilename;
   OrigText.Clear;
@@ -337,52 +541,85 @@ begin
   //
   repeat
     Key := PollNextKey;
-    case (TranslateKeyEvent(Key) and $FFFF) of
-      kbdUp: begin
-        if Mode = vmText then
-          StartLine := StartLine - 1;
-        if Mode = vmHex then
-          CurrentByte := Max(0, CurrentByte - NumBytesPerLine);
+    if Key > 0 then
+    begin
+      st := GetKeyEventShiftState(Key);
+      case (TranslateKeyEvent(Key) and $FFFF) of
+        kbdUp: begin
+          FUntilByte := 0;
+          if Mode = vmText then
+            StartLine := StartLine - 1;
+          if Mode = vmHex then
+            CurrentByte := Max(0, CurrentByte - NumBytesPerLine);
+        end;
+        kbdDown: begin
+          FUntilByte := 0;
+          if Mode = vmText then
+            StartLine := StartLine + 1;
+          if Mode = vmHex then
+            CurrentByte := Min(NumBytes - 1, Int64(CurrentByte) + NumBytesPerLine);
+        end;
+        kbdRight: begin
+          FUntilByte := 0;
+          if Mode = vmHex then
+            CurrentByte :=  Min(NumBytes - 1, Int64(CurrentByte) + 1);
+        end;
+        kbdLeft: begin
+          FUntilByte := 0;
+          if Mode = vmHex then
+            CurrentByte := Max(0, CurrentByte - 1);
+        end;
+        kbdPgUp, $39:begin
+          FUntilByte := 0;
+          if Mode = vmText then
+            StartLine := StartLine - 10;
+          if Mode = vmHex then
+            CurrentByte := Max(0, CurrentByte - Int64(ScreenHeight) * NumBytesPerLine);
+        end;                                       // pg up -> Move around
+        kbdPgDn, $33:  begin
+          FUntilByte := 0;
+          if Mode = vmText then
+            StartLine := StartLine + 10;
+          if Mode = vmHex then
+            CurrentByte := Min(NumBytes - 1, CurrentByte + Int64(ScreenHeight) * NumBytesPerLine);
+        end;                                      // pg down -> Move around
+        kbdHome, $37: begin
+          FUntilByte := 0;
+          FCurrentByte := 0;
+          StartLine := 0;                      // Home -> Move around
+        end;
+        kbdEnd, $31: begin
+          FUntilByte := 0;
+          if Mode = vmText then
+            StartLine := MaxInt                  // end -> Move around
+          else
+            CurrentByte := NumBytes - 1;
+        end;
+        kbdF10,kbdF3: Break;
+        kbdF1: begin ShowViewHelp; Paint; end;
+        kbdF4: SwitchMode;
+        kbdF5: begin
+          FUntilByte := 0;
+          GoToLineNumber;
+        end;
+        kbdF7: begin
+          FUntilByte := 0;
+          if Mode = vmText then
+          begin
+            if st and kbShift <> 0 then
+              FindText(LastTextSearch, Point(FromSel.X + 1, FromSel.Y))
+            else
+              SearchText;
+          end;
+          if Mode = vmHex then
+          begin
+            if st and kbShift <> 0 then
+              FindBinary(LastBinSearch, FCurrentByte + 1)
+            else
+              SearchBinary;
+          end;
+        end;
       end;
-      kbdDown: begin
-        if Mode = vmText then
-          StartLine := StartLine + 1;
-        if Mode = vmHex then
-          CurrentByte := Min(NumBytes - 1, Int64(CurrentByte) + NumBytesPerLine);
-      end;
-      kbdRight: begin
-        if Mode = vmHex then
-          CurrentByte :=  Min(NumBytes - 1, Int64(CurrentByte) + 1);
-      end;
-      kbdLeft: begin
-        if Mode = vmHex then
-          CurrentByte := Max(0, CurrentByte - 1);
-      end;
-      kbdPgUp, $39:begin
-        if Mode = vmText then
-          StartLine := StartLine - 10;
-        if Mode = vmHex then
-          CurrentByte := Max(0, CurrentByte - Int64(ScreenHeight) * NumBytesPerLine);
-      end;                                       // pg up -> Move around
-      kbdPgDn, $33:  begin
-        if Mode = vmText then
-          StartLine := StartLine + 10;
-        if Mode = vmHex then
-          CurrentByte := Min(NumBytes - 1, CurrentByte + Int64(ScreenHeight) * NumBytesPerLine);
-      end;                                      // pg down -> Move around
-      kbdHome, $37: begin
-        FCurrentByte := 0;
-        StartLine := 0;                      // Home -> Move around
-      end;
-      kbdEnd, $31: begin
-        if Mode = vmText then
-          StartLine := MaxInt                  // end -> Move around
-        else
-          CurrentByte := NumBytes - 1;
-      end;
-      kbdF10: Break;
-      kbdF1: begin ShowViewHelp; Paint; end;
-      kbdF4: SwitchMode;
     end;
     Sleep(25);
   until (Key and $ff00) = $0100;

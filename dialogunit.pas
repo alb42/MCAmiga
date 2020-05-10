@@ -76,11 +76,25 @@ type
   private
      TxtL, TxtR: LongInt;
   protected
+     procedure DrawButtons; override;
+  protected
     procedure Paint; override; // Draw the window
+    function IsValidChar(c: Char): Boolean; virtual;
+    function ValidInput(s: string): Boolean; virtual;
   public
     NewName: string;
     AsName: Boolean;
     function Execute: Integer; override; // returns the number of the Button pressed
+  end;
+
+  { TAskForNumber }
+
+  TAskForNumber = class(TAskForName)
+  protected
+    function IsValidChar(c: Char): Boolean; override;
+    function ValidInput(s: string): Boolean; override;
+  public
+    HexNumber: Boolean;
   end;
 
   { TSingleProgress }
@@ -121,6 +135,8 @@ type
 
 function AskQuestion(AText: string): Boolean; // yes = true
 function AskForName(AText: string; var ANewName: string; UseAsName: Boolean = True): Boolean;
+function AskForNumber(AText: string; var ANewNumber: Integer): Boolean;
+function AskForHexNumber(AText: string; var HexString: string): Boolean;
 
 procedure ShowHelp;
 procedure ShowViewHelp;
@@ -150,9 +166,10 @@ const       //.........1.........2.........3.........4.........5........6.......
 
   const       //.........1.........2.........3.........4.........5........6.........7
   HelpViewText = '       Editor Help       '#13#10 +
-                 ' F1  - Help'#13#10 +
+                 ' F1  - Help                        F3/F10/ESC - Leave Viewer'#13#10 +
                  ' F4  - Toggle ASCII and Hex View '#13#10 +
-                 ' F10/ESC - Leave Viewer'#13#10 +
+                 ' F5  - Jump to line or address'#13#10 +
+                 ' F7  - Search                      Shift F7 - Search again'#13#10 +
                  ' Cursor Keys(4,6,8,2) Pg Up(9), Pg Down(3),'#13#10 +
                  '    Home(7), End(1) - navigate in Text'#13#10 +
                  ' '#13#10 + '';
@@ -220,6 +237,54 @@ begin
       ANewName := NewName;
     Free;
   end;
+end;
+
+function AskForNumber(AText: string; var ANewNumber: Integer): Boolean;
+begin
+  with TAskForNumber.Create do
+  begin
+    Text := AText;
+    NewName := '';
+    HexNumber := False;
+    Result := Execute = 0;
+    if Result then
+      Result := TryStrToInt(NewName, ANewNumber);
+    Free;
+  end;
+end;
+
+function AskForHexNumber(AText: string; var HexString: string): Boolean;
+begin
+  with TAskForNumber.Create do
+  begin
+    Text := AText;
+    NewName := HexString;
+    HexNumber := True;
+    Result := Execute = 0;
+    if Result then
+      HexString := NewName;
+    Free;
+  end;
+end;
+
+
+{ TAskForNumber }
+
+function TAskForNumber.IsValidChar(c: Char): Boolean;
+begin
+  if HexNumber then
+    Result := c in ['0'..'9','a'..'f','A'..'F',' ']
+  else
+    Result := c in ['0'..'9','$','a'..'f','A'..'F'];
+end;
+
+function TAskForNumber.ValidInput(s: string): Boolean;
+var
+  i: Integer;
+begin
+  Result := HexNumber or TryStrToInt(s, i);
+  if s= '$' then
+    Result := True;
 end;
 
 { TNonWaitMessage }
@@ -443,20 +508,52 @@ end;
 
 { TAskForName }
 
+function TAskForName.IsValidChar(c: Char): Boolean;
+begin
+  Result := c in ['a'..'z','A'..'Z','-','.','_','0'..'9',' '];
+  if not AsName and (c = '*') then
+    Result := True;
+end;
+
+function TAskForName.ValidInput(s: string): Boolean;
+begin
+  Result := True;
+end;
+
+procedure TAskForName.DrawButtons;
+begin
+  FGPen := Black;
+  if YesActive then
+    BGPen := Cyan
+  else
+    BGPen := LightGray;
+  SetText(Mid.x - 6, WindowRect.Bottom, LBorder + 'Ok' + RBorder);
+  if not YesActive then
+    BGPen := Cyan
+  else
+    BGPen := LightGray;
+  SetText(Mid.x + 2, WindowRect.Bottom, LBorder + 'Cancel' + RBorder);
+  BGPen := LightGray;
+end;
+
 procedure TAskForName.Paint;
 var
   x: LongInt;
+  l: Integer;
 begin
   inherited;
-  WindowRect.Left := Max(2, mid.x - 20);
+
+  l := Length(Text) div 2;
+
+  WindowRect.Left := Max(2, mid.x - Max(20, l + 1));
   WindowRect.Top := Max(2, mid.y - 2);
   WindowRect.Bottom := Min(ScreenHeight - 3, mid.y + 2);
-  WindowRect.Right :=  Min(ScreenWidth - 3, mid.x + 20);
+  WindowRect.Right :=  Min(ScreenWidth - 3, mid.x + Max(20, l + 1));
   BGPen := LightGray;
   FGPen := Black;
   DrawWindowBorder;
 
-  SetText(Mid.X - Length(Text) div 2, Mid.Y - 1, Text);
+  SetText(Mid.X - l, Mid.Y - 1, Text);
 
   TxtL := WindowRect.Left + 2;
   TxtR := WindowRect.Right - 2;
@@ -484,6 +581,7 @@ var
   Key: TKeyEvent;
   c: Char;
   p: LongInt;
+  OldName: String;
 begin
   YesActive := True;
   Paint;
@@ -517,18 +615,23 @@ begin
       begin
         c := GetKeyEventChar(Key);
         case c of
-          'a'..'z','A'..'Z','-','.','_','0'..'9',' ','*': begin
-            if (not AsName) or (c <> '*') then
+          #32..#126: begin
+            if IsValidChar(c) then
             begin
               p := CursorX - TxtL;
               if (p >= 0) and (Length(NewName) < 30) then
               begin
-                Insert(c, NewName, p + 1);
-                BGPen := Black;
-                FGPen := LightGray;
-                SetText(TxtL, Mid.y, Newname);
-                SetCursorPos(CursorX + 1, Mid.Y);
-                UpdateScreen(False);
+                OldName := NewName;
+                Insert(c, OldName, p + 1);
+                if ValidInput(OldName) then
+                begin
+                  NewName := OldName;
+                  BGPen := Black;
+                  FGPen := LightGray;
+                  SetText(TxtL, Mid.y, Newname);
+                  SetCursorPos(CursorX + 1, Mid.Y);
+                  UpdateScreen(False);
+                end;
               end;
             end;
           end;
