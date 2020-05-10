@@ -52,6 +52,12 @@ begin
     except
     end;
   end;
+  // check for close window message
+  if HasCloseWindow then
+  begin
+    Result := $011B; // return as ESC
+    Exit;
+  end;
   {$endif}
   // we got killed
   if Terminated then
