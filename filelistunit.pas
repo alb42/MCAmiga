@@ -1118,6 +1118,40 @@ begin
   end;
 end;
 
+function GetFileSize(const Name: string): Int64;
+var
+  SRec: TSearchRec;
+begin
+  if FindFirst(name, faAnyfile, SRec) = 0 then
+  begin
+    Result := SRec.Size;
+    FindClose(SRec);
+  end
+  else
+    Result := 0;
+end;
+
+function OverwriteText(Src, dest: string): string;
+var
+  fileDate: Int64;
+begin
+  Result := '     New:      ';
+  fileDate := FileAge(Src);
+  if fileDate > -1 then
+    Result := Result + FormatDateTime('YYYY-MM-DD hh:nn:ss', FileDateToDateTime(fileDate))
+  else
+    Result := '               ';
+  Result := Result + '    ' + IntToStr(GetFileSize(Src)) + ' bytes     '#13#10;
+
+  Result := Result + '     Existing: ';
+  fileDate := FileAge(dest);
+  if fileDate > -1 then
+    Result := Result + FormatDateTime('YYYY-MM-DD hh:nn:ss', FileDateToDateTime(fileDate))
+  else
+    Result := '               ';
+  Result := Result + '    ' + IntToStr(GetFileSize(dest)) + ' bytes     '#13#10;
+end;
+
 //############ Copy
 procedure TFileList.CopyFiles(Target: string);
 const
@@ -1138,7 +1172,9 @@ var
   PG: TSingleProgress;
   PG2: TDoubleProgress;
   Size: Int64;
+  Res: TDialogResult;
 begin
+  Res := mrNone;
   FL := TEntryList.Create;
   try
     PG := nil;
@@ -1166,9 +1202,9 @@ begin
           try
             PG.UpdateValue(0, FL[0].Name);
             // check if the same file
-            {$ifdef HASAMIGA}
             if FileExists(IncludeTrailingPathDelimiter(Target) + FL[0].Name) then
             begin
+              {$ifdef HASAMIGA}
               SrcLock := Lock(PChar(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name), SHARED_LOCK);
               DestLock := Lock(PChar(IncludeTrailingPathDelimiter(Target) + FL[0].Name), SHARED_LOCK);
               IsSame := SameLock(SrcLock, DestLock);
@@ -1176,8 +1212,10 @@ begin
               UnLock(DestLock);
               if IsSame = LOCK_SAME then
                 raise Exception.Create('Cannot copy on itself');
+              {$endif}
+              if not AskQuestion('File "' + FL[0].Name +'" already exists, Overwrite?'#13#10 + OverwriteText(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name, IncludeTrailingPathDelimiter(Target) + FL[0].Name)) then
+                Exit;
             end;
-            {$endif}
             Src := TFileStream.Create(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name, fmOpenRead);
             Dest := TFileStream.Create(IncludeTrailingPathDelimiter(Target) + FL[0].Name, fmCreate);
             NumBytes := 0;
@@ -1262,9 +1300,9 @@ begin
               end;
               if FL[i].EType = etFile then
               begin
-                {$ifdef HASAMIGA}
-                if FileExists(IncludeTrailingPathDelimiter(Target) + FL[0].Name) then
+                if FileExists(IncludeTrailingPathDelimiter(Target) + FL[i].Name) then
                 begin
+                  {$ifdef HASAMIGA}
                   SrcLock := Lock(PChar(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name), SHARED_LOCK);
                   DestLock := Lock(PChar(NewName), SHARED_LOCK);
                   IsSame := SameLock(SrcLock, DestLock);
@@ -1272,8 +1310,19 @@ begin
                   UnLock(DestLock);
                   if IsSame = LOCK_SAME then
                     raise Exception.Create('Can''t copy on itself');
+                  {$endif}
+                  if Res = mrNone then
+                    Res := AskMultipleQuestion('File "' + FL[i].Name +'" already exists, Overwrite?'#13#10 + OverwriteText(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name, IncludeTrailingPathDelimiter(Target) + FL[i].Name));
+                  case Res of
+                    mrOK: begin Res := mrNone; end;
+                    mrCancel: begin Res := mrNone; Continue; end;
+                    mrAll: ;
+                    mrNoAll: Continue;
+                    mrAbort: Exit;
+                    else
+                      ;
+                  end;
                 end;
-                {$endif}
                 Src := TFileStream.Create(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name, fmOpenRead);
                 Dest := TFileStream.Create(NewName, fmCreate);
                 repeat
@@ -1357,7 +1406,9 @@ var
   PG2: TDoubleProgress;
   Size: Int64;
   IsSameDevice: Boolean;
+  Res: TDialogResult;
 begin
+  Res := mrNone;
   FL := TEntryList.Create;
   try
     PG := nil;
@@ -1383,11 +1434,25 @@ begin
       if AskQuestion('Move ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files (' + Trim(FormatSize(Size))  + 'byte)? ') then
       begin
         PG := TSingleProgress.Create;
-        PG.Text := 'Mopy ';
+        PG.Text := 'Move ';
         PG.MaxValue := FL.Count;
         PG.Execute;
         for i := 0 to FL.Count - 1 do
         begin
+          if (FL[i].EType = etFile) and FileExists(IncludeTrailingPathDelimiter(Target) + FL[i].Name) then
+          begin
+            if Res = mrNone then
+              Res := AskMultipleQuestion('File "' + FL[i].Name +'" already exists, Overwrite?'#13#10 + OverwriteText(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name, IncludeTrailingPathDelimiter(Target) + FL[i].Name));
+            case Res of
+              mrOK: begin DeleteFile(IncludeTrailingPathDelimiter(Target) + FL[i].Name); Res := mrNone; end;
+              mrCancel: begin Res := mrNone; Continue; end;
+              mrAll: DeleteFile(IncludeTrailingPathDelimiter(Target) + FL[i].Name);
+              mrNoAll: Continue;
+              mrAbort: Exit;
+              else
+                ;
+            end;
+          end;
           if FL[i].EType in [etDir, etFile] then
           begin
             PG.UpdateValue(i, FL[i].Name);
@@ -1405,22 +1470,20 @@ begin
     begin
       if AskQuestion('Move ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files (' + Trim(FormatSize(Size))  + 'byte)? ') then
       begin
-        //---------- copy one file
+        //---------- move one file
         if (FL.Count = 1) and (FL[0].EType = etFile) then
         begin
           PG := TSingleProgress.Create;
-          PG.Text := 'Mopy ';
+          PG.Text := 'Move ';
           PG.MaxValue := FL[0].Size;
           PG.Execute;
-          //StartProgress('Copy ', FL[0].Size);
           Buffer := AllocMem(BufferSize);
           try
             PG.UpdateValue(0, FL[0].Name);
-            //UpdateProgress(0, FL[0].Name);
             // check if the same file
-            {$ifdef HASAMIGA}
             if FileExists(IncludeTrailingPathDelimiter(Target) + FL[0].Name) then
             begin
+              {$ifdef HASAMIGA}
               SrcLock := Lock(PChar(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name), SHARED_LOCK);
               DestLock := Lock(PChar(IncludeTrailingPathDelimiter(Target) + FL[0].Name), SHARED_LOCK);
               IsSame := SameLock(SrcLock, DestLock);
@@ -1428,8 +1491,10 @@ begin
               UnLock(DestLock);
               if IsSame = LOCK_SAME then
                 raise Exception.Create('Can''t move  on itself');
+              {$endif}
+              if not AskQuestion('File "' + FL[0].Name +'" already exists, Overwrite?'#13#10 + OverwriteText(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name, IncludeTrailingPathDelimiter(Target) + FL[0].Name)) then
+                Exit;
             end;
-            {$endif}
             Src := TFileStream.Create(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name, fmOpenRead);
             Dest := TFileStream.Create(IncludeTrailingPathDelimiter(Target) + FL[0].Name, fmCreate);
             NumBytes := 0;
@@ -1514,9 +1579,9 @@ begin
               end;
               if FL[i].EType = etFile then
               begin
-                {$ifdef HASAMIGA}
-                if FileExists(IncludeTrailingPathDelimiter(Target) + FL[0].Name) then
+                if FileExists(IncludeTrailingPathDelimiter(Target) + FL[i].Name) then
                 begin
+                  {$ifdef HASAMIGA}
                   SrcLock := Lock(PChar(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name), SHARED_LOCK);
                   DestLock := Lock(PChar(NewName), SHARED_LOCK);
                   IsSame := SameLock(SrcLock, DestLock);
@@ -1524,8 +1589,19 @@ begin
                   UnLock(DestLock);
                   if IsSame = LOCK_SAME then
                     raise Exception.Create('Can''t move on itself');
+                  {$endif}
+                  if Res = mrNone then
+                    Res := AskMultipleQuestion('File "' + FL[i].Name +'" already exists, Overwrite?'#13#10 + OverwriteText(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name, IncludeTrailingPathDelimiter(Target) + FL[i].Name));
+                  case Res of
+                    mrOK: begin Res := mrNone; end;
+                    mrCancel: begin Res := mrNone; Continue; end;
+                    mrAll: ;
+                    mrNoAll: Continue;
+                    mrAbort: Exit;
+                    else
+                      ;
+                  end;
                 end;
-                {$endif}
                 Src := TFileStream.Create(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name, fmOpenRead);
                 Dest := TFileStream.Create(NewName, fmCreate);
                 repeat

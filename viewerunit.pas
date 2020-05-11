@@ -49,8 +49,6 @@ type
     procedure SearchBinary;
     procedure FindBinary(SearchString: string; FromWhere: Integer);
   private
-    SelectStart: LongWord;
-    SelectEnd: LongWord;
     FromSel, ToSel: TPoint;
     LastTextSearch: string;
     procedure SearchText;
@@ -175,10 +173,10 @@ begin
     FGPen := White;
     for i := 0 to ScreenHeight - 2 do
     begin
-      s := ShownText[i + StartLine];
-      l := Length(s);
       if i + StartLine < ShownText.Count then
       begin
+        s := ShownText[i + StartLine];
+        l := Length(s);
         if InRange(i + StartLine, FromSel.Y, ToSel.Y) then
         begin
           s1 := s;

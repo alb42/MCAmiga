@@ -23,6 +23,8 @@ const
   ProgressFull = #219;
 
 type
+                //yes     no,    yes to All    No to all      Abort   None
+  TDialogResult=(mrOK, mrCancel, mrAll,         mrNoAll,    mrAbort, mrNone);
 
   { TBaseDialog }
 
@@ -37,7 +39,7 @@ type
     procedure DrawWindowBorder; virtual;
     procedure Paint; virtual; // Draw the window
   public
-    function Execute: Integer; virtual; abstract; // returns the number of the Button pressed
+    function Execute: TDialogResult; virtual; abstract; // returns the number of the Button pressed
   end;
 
   { TShowMessage }
@@ -48,7 +50,7 @@ type
     procedure Paint; override; // Draw the window
   public
     Text: string; // set before Execute!
-    function Execute: Integer; override; // returns the number of the Button pressed
+    function Execute: TDialogResult; override; // returns the number of the Button pressed
   end;
 
   { TNonWaitMessage }
@@ -57,17 +59,28 @@ type
   protected
     procedure DrawButtons; override;
   public
-    function Execute: Integer; override;
+    function Execute: TDialogResult; override;
   end;
 
   { TAskQuestion }
 
   TAskQuestion = class(TShowMessage)
   protected
-    YesActive: Boolean;
+    ActiveButton: TDialogResult;
     procedure DrawButtons; override;
+    procedure NextButton; virtual;
+    procedure PrevButton; virtual;
   public
-    function Execute: Integer; override; // returns the number of the Button pressed
+    function Execute: TDialogResult; override; // returns the number of the Button pressed
+  end;
+
+  { TAskMultipleQuestion }
+
+  TAskMultipleQuestion = class(TAskQuestion)
+  protected
+    procedure DrawButtons; override;
+    procedure NextButton; override;
+    procedure PrevButton; override;
   end;
 
   { TAskForName }
@@ -84,7 +97,7 @@ type
   public
     NewName: string;
     AsName: Boolean;
-    function Execute: Integer; override; // returns the number of the Button pressed
+    function Execute: TDialogResult; override; // returns the number of the Button pressed
   end;
 
   { TAskForNumber }
@@ -112,7 +125,7 @@ type
   public
     MaxValue: LongWord;
     Text: string;
-    function Execute: Integer; override;
+    function Execute: TDialogResult; override;
     function UpdateValue(AValue: LongWord; NText: string = ''): Boolean; virtual;
   end;
 
@@ -125,7 +138,7 @@ type
   public
     MaxValue2: LongWord;
     Text2: string;
-    function Execute: Integer; override;
+    function Execute: TDialogResult; override;
     function UpdateValue(AValue: LongWord; NText: string = ''): Boolean; override;
     function UpdateValue2(AValue1: LongWord; NText1: string = ''; AValue2: LongWord = 0; NText2: string = ''): Boolean;
   end;
@@ -134,6 +147,7 @@ type
 
 
 function AskQuestion(AText: string): Boolean; // yes = true
+function AskMultipleQuestion(AText: string): TDialogResult;
 function AskForName(AText: string; var ANewName: string; UseAsName: Boolean = True): Boolean;
 function AskForNumber(AText: string; var ANewNumber: Integer): Boolean;
 function AskForHexNumber(AText: string; var HexString: string): Boolean;
@@ -219,11 +233,20 @@ begin
   with TAskQuestion.Create do
   begin
     Text := AText;
-    Result := Execute = 0;
+    Result := Execute = mrOk;
     Free;
   end;
 end;
 
+function AskMultipleQuestion(AText: string): TDialogResult;
+begin
+  with TAskMultipleQuestion.Create do
+  begin
+    Text := AText;
+    Result := Execute;
+    Free;
+  end;
+end;
 
 function AskForName(AText: String; var ANewname: String; UseAsName: Boolean = True): Boolean;
 begin
@@ -232,7 +255,7 @@ begin
     Text := AText;
     NewName := ANewName;
     AsName := UseAsName;
-    Result := Execute = 0;
+    Result := Execute = mrOK;
     if Result then
       ANewName := NewName;
     Free;
@@ -246,7 +269,7 @@ begin
     Text := AText;
     NewName := '';
     HexNumber := False;
-    Result := Execute = 0;
+    Result := Execute = mrOK;
     if Result then
       Result := TryStrToInt(NewName, ANewNumber);
     Free;
@@ -260,13 +283,77 @@ begin
     Text := AText;
     NewName := HexString;
     HexNumber := True;
-    Result := Execute = 0;
+    Result := Execute = mrOK;
     if Result then
       HexString := NewName;
     Free;
   end;
 end;
 
+{ TAskMultipleQuestion }
+
+procedure TAskMultipleQuestion.DrawButtons;
+begin
+  FGPen := Black;
+  if ActiveButton = mrOK then
+    BGPen := Cyan
+  else
+    BGPen := LightGray;
+  SetText(Mid.x - 22, WindowRect.Bottom, LBorder + 'Yes' + RBorder);
+  //
+  if ActiveButton = mrCancel then
+    BGPen := Cyan
+  else
+    BGPen := LightGray;
+  SetText(Mid.x - 16, WindowRect.Bottom, LBorder + 'No' + RBorder);
+  //
+  if ActiveButton = mrAll then
+    BGPen := Cyan
+  else
+    BGPen := LightGray;
+  SetText(Mid.x - 10, WindowRect.Bottom, LBorder + 'Yes to All' + RBorder);
+  //
+  if ActiveButton = mrNoAll then
+    BGPen := Cyan
+  else
+    BGPen := LightGray;
+  SetText(Mid.x + 4, WindowRect.Bottom, LBorder + 'No to All' + RBorder);
+  //
+  if ActiveButton = mrAbort then
+    BGPen := Cyan
+  else
+    BGPen := LightGray;
+  SetText(Mid.x + 16, WindowRect.Bottom, LBorder + 'Abort' + RBorder);
+  BGPen := LightGray;
+end;
+
+procedure TAskMultipleQuestion.NextButton;
+begin
+  case ActiveButton of
+    mrOK: ActiveButton := mrCancel;
+    mrCancel: ActiveButton := mrAll;
+    mrAll: ActiveButton := mrNoAll;
+    mrNoAll: ActiveButton := mrAbort;
+    else
+      ;
+  end;
+  DrawButtons;
+  UpdateScreen(False);
+end;
+
+procedure TAskMultipleQuestion.PrevButton;
+begin
+  case ActiveButton of
+    mrCancel: ActiveButton := mrOK;
+    mrAll: ActiveButton := mrCancel;
+    mrNoAll: ActiveButton := mrAll;
+    mrAbort: ActiveButton := mrNoAll;
+    else
+      ;
+  end;
+  DrawButtons;
+  UpdateScreen(False);
+end;
 
 { TAskForNumber }
 
@@ -294,9 +381,9 @@ begin
   // No button here ;)
 end;
 
-function TNonWaitMessage.Execute: Integer;
+function TNonWaitMessage.Execute: TDialogResult;
 begin
-  Result := 0;
+  Result := mrOK;
   Paint;
 end;
 
@@ -339,7 +426,7 @@ begin
   UpdateScreen(False);
 end;
 
-function TDoubleProgress.Execute: Integer;
+function TDoubleProgress.Execute: TDialogResult;
 begin
   Result := inherited Execute;
 end;
@@ -451,16 +538,15 @@ begin
   UpdateScreen(False);
 end;
 
-function TSingleProgress.Execute: Integer;
+function TSingleProgress.Execute: TDialogResult;
 begin
-  Result := 1;
+  Result := mrOK;
   {$WARNINGS OFF}
   LastCall := GetTickCount;
   {$WARNINGS ON}
   CurValue := 0;
   if MaxValue = 0 then
     MaxValue := 1;
-
   Paint;
 end;
 
@@ -523,12 +609,12 @@ end;
 procedure TAskForName.DrawButtons;
 begin
   FGPen := Black;
-  if YesActive then
+  if ActiveButton = mrOK then
     BGPen := Cyan
   else
     BGPen := LightGray;
   SetText(Mid.x - 6, WindowRect.Bottom, LBorder + 'Ok' + RBorder);
-  if not YesActive then
+  if ActiveButton = mrCancel then
     BGPen := Cyan
   else
     BGPen := LightGray;
@@ -576,14 +662,14 @@ begin
   UpdateScreen(False);
 end;
 
-function TAskForName.Execute: Integer;
+function TAskForName.Execute: TDialogResult;
 var
   Key: TKeyEvent;
   c: Char;
   p: LongInt;
   OldName: String;
 begin
-  YesActive := True;
+  ActiveButton := mrOK;
   Paint;
   repeat
     Key := PollNextKey;
@@ -597,15 +683,18 @@ begin
           SetCursorPos(CursorX + 1, CursorY);
       end;
       $1C0D: begin
-        Result := ifthen(YesActive, 0, 1);
+        Result := ActiveButton;
         Break;
       end;
       $011B: begin
-        Result := 1;
+        Result := mrCancel;
         Break;
       end;
       $0F09: begin
-        YesActive := not YesActive;
+        if ActiveButton = mrOK then
+          ActiveButton := mrCancel
+        else
+          ActiveButton := mrOK;
         FGPen := Black;
         BGPen := LightGray;
         DrawButtons;
@@ -661,12 +750,12 @@ end;
 procedure TAskQuestion.DrawButtons;
 begin
   FGPen := Black;
-  if YesActive then
+  if ActiveButton = mrOK then
     BGPen := Cyan
   else
     BGPen := LightGray;
   SetText(Mid.x - 6, WindowRect.Bottom, LBorder + 'Yes' + RBorder);
-  if not YesActive then
+  if ActiveButton = mrCancel then
     BGPen := Cyan
   else
     BGPen := LightGray;
@@ -674,46 +763,44 @@ begin
   BGPen := LightGray;
 end;
 
-function TAskQuestion.Execute: Integer;
+procedure TAskQuestion.NextButton;
+begin
+  if ActiveButton = mrOK then
+  begin
+    ActiveButton := mrCancel;
+    DrawButtons;
+    UpdateScreen(False);
+  end;
+end;
+
+procedure TAskQuestion.PrevButton;
+begin
+  if ActiveButton = mrCancel then
+  begin
+    ActiveButton := mrOK;
+    DrawButtons;
+    UpdateScreen(False);
+  end;
+end;
+
+function TAskQuestion.Execute: TDialogResult;
 var
   Key: TKeyEvent;
 begin
-  YesActive := True;
-  Result := 0;
+  ActiveButton := mrOK;
+  Result := mrOK;
   Paint;
   repeat
     Key := PollNextKey;
     case (Key and $FFFF) of
       $1C0D, $000D: begin
-        if YesActive then
-          Result := 0
-        else
-          Result := 1;
+        Result := ActiveButton;
         Break;
       end;
-      $0F09: begin
-        YesActive := not YesActive;
-        DrawButtons;
-        UpdateScreen(False);
-      end;
-      $4B00, $34: begin // cursor left
-        if not YesActive then
-        begin
-          YesActive := True;
-          DrawButtons;
-          UpdateScreen(False);
-        end;
-      end;
-      $4D00, $36: begin // cursor right
-        if YesActive then
-        begin
-          YesActive := False;
-          DrawButtons;
-          UpdateScreen(False);
-        end;
-      end;
+      $4B00, $34: PrevButton; // cursor left
+      $4D00, $36: NextButton; // cursor right
       $011B: begin
-        Result := 1;
+        Result := mrCancel;
         Exit;
       end;
     end;
@@ -829,11 +916,11 @@ begin
   UpdateScreen(False);
 end;
 
-function TShowMessage.Execute: Integer;
+function TShowMessage.Execute: TDialogResult;
 var
   Key: TKeyEvent;
 begin
-  Result := 0;
+  Result := mrOK;
   Paint;
   repeat
     Key := PollNextKey;
