@@ -5,7 +5,7 @@ unit viewerunit;
 interface
 
 uses
-  Classes, SysUtils, Video, Keyboard, Math,
+  Classes, SysUtils, Video, Keyboard, Mouse, Math,
   EventUnit;
 
 const
@@ -29,6 +29,7 @@ type
     NumBytes: LongWord;
     Num4BytesPerLine: LongWord;
     NumBytesPerLine: LongWord;
+    OffsetForChars: LongWord;
     FCurrentByte: LongWord;
     FUntilByte: LongWord;
     Mode: TViewerMode;
@@ -37,6 +38,7 @@ type
     OrigText: TStringList;
     ShownText: TStringList;
     function PollNextKey: TKeyEvent;
+    procedure GotMouseEvent(Me: TMouseEvent);
     procedure FormatText;
     procedure Paint;
     procedure SetCurrentByte(AValue: LongWord);
@@ -73,12 +75,47 @@ end;
 { TFileViewer }
 
 function TFileViewer.PollNextKey: TKeyEvent;
+var
+  Me: TMouseEvent;
 begin
   Result := GetNextKeyEvent;
   if Result = ResizeKey then
   begin
     FormatText;
     Paint;
+  end;
+  if GetNextMouseEvent(Me) then
+    GotMouseEvent(Me);
+end;
+
+procedure TFileViewer.GotMouseEvent(Me: TMouseEvent);
+var
+  yPos, XPos: LongWord;
+  l: LongWord;
+begin
+  if (Me.Action = MouseActionDown) and (Me.buttons = MouseLeftButton) then
+  begin
+    if Mode = vmHex then
+    begin
+      yPos := me.y - 1 + FStartLine;
+      if me.x < 9 then
+        Exit;
+      if me.x < OffsetForChars then
+      begin // clicked to HexStrings
+        xPos := me.x - 9;
+        l := xPos div 13;
+        xPos := (xPos mod 13) div 3;
+        xPos := xPos + l * 4;
+        CurrentByte := yPos * NumBytesPerLine + xPos;
+      end
+      else
+      begin // clicked to Chars
+        xPos := me.x - OffsetForChars;
+        if xPos >= NumBytesPerLine then
+          Exit;
+        CurrentByte := yPos * NumBytesPerLine + xPos;
+      end;
+    end;
   end;
 end;
 
@@ -139,7 +176,7 @@ end;
 procedure TFileViewer.Paint;
 var
   i, l,  cx, l1: Integer;
-  j, StartByte, cb, OffsetForChars, EndOfDisplay: LongWord;
+  j, StartByte, cb, EndOfDisplay: LongWord;
   s, s1, s2: String;
   pl: PByte;
 
