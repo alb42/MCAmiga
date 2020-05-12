@@ -5,7 +5,7 @@ unit dialogunit;
 interface
 
 uses
-  Classes, SysUtils, Video, Keyboard, Mouse, Math, EventUnit;
+  Types, Classes, SysUtils, Video, Keyboard, Mouse, Math, EventUnit;
 
 const
   URCorner = #191;
@@ -33,6 +33,7 @@ type
     Mid: TPoint;
     WindowRect: TRect;
     InnerRect: TRect;
+    procedure ProcessMouse(MouseEvent: TMouseEvent); virtual;
   protected
     function PollNextKey: TKeyEvent; virtual;
     procedure DrawButtons; virtual; abstract;
@@ -46,8 +47,17 @@ type
 
   TShowMessage = class(TBaseDialog)
   protected
+    SelectedButton: Integer;
+    ButtonsArray: array of record
+      Rect: TRect;
+      Pressed: Boolean;
+      Title: string;
+      Result: TDialogResult;
+    end;
     procedure DrawButtons; override;
+    procedure ConfigureButtons; virtual;
     procedure Paint; override; // Draw the window
+    procedure ProcessMouse(MouseEvent: TMouseEvent); override; // click to ok
   public
     Text: string; // set before Execute!
     function Execute: TDialogResult; override; // returns the number of the Button pressed
@@ -66,21 +76,14 @@ type
 
   TAskQuestion = class(TShowMessage)
   protected
-    ActiveButton: TDialogResult;
-    procedure DrawButtons; override;
-    procedure NextButton; virtual;
-    procedure PrevButton; virtual;
-  public
-    function Execute: TDialogResult; override; // returns the number of the Button pressed
+    procedure ConfigureButtons; override;
   end;
 
   { TAskMultipleQuestion }
 
   TAskMultipleQuestion = class(TAskQuestion)
   protected
-    procedure DrawButtons; override;
-    procedure NextButton; override;
-    procedure PrevButton; override;
+    procedure ConfigureButtons; override;
   end;
 
   { TAskForName }
@@ -89,7 +92,7 @@ type
   private
      TxtL, TxtR: LongInt;
   protected
-     procedure DrawButtons; override;
+     //procedure DrawButtons; override;
   protected
     procedure Paint; override; // Draw the window
     function IsValidChar(c: Char): Boolean; virtual;
@@ -119,9 +122,11 @@ type
     Pup: LongInt;
     PGL: LongInt;
     PGR: LongInt;
+    CancelPressed: Boolean;
   protected
     procedure DrawButtons; override;
     procedure Paint; override;
+    procedure ProcessMouse(MouseEvent: TMouseEvent); override; // click to ok
   public
     MaxValue: LongWord;
     Text: string;
@@ -292,68 +297,35 @@ end;
 
 { TAskMultipleQuestion }
 
-procedure TAskMultipleQuestion.DrawButtons;
+procedure TAskMultipleQuestion.ConfigureButtons;
 begin
-  FGPen := Black;
-  if ActiveButton = mrOK then
-    BGPen := Cyan
-  else
-    BGPen := LightGray;
-  SetText(Mid.x - 22, WindowRect.Bottom, LBorder + 'Yes' + RBorder);
-  //
-  if ActiveButton = mrCancel then
-    BGPen := Cyan
-  else
-    BGPen := LightGray;
-  SetText(Mid.x - 16, WindowRect.Bottom, LBorder + 'No' + RBorder);
-  //
-  if ActiveButton = mrAll then
-    BGPen := Cyan
-  else
-    BGPen := LightGray;
-  SetText(Mid.x - 10, WindowRect.Bottom, LBorder + 'Yes to All' + RBorder);
-  //
-  if ActiveButton = mrNoAll then
-    BGPen := Cyan
-  else
-    BGPen := LightGray;
-  SetText(Mid.x + 4, WindowRect.Bottom, LBorder + 'No to All' + RBorder);
-  //
-  if ActiveButton = mrAbort then
-    BGPen := Cyan
-  else
-    BGPen := LightGray;
-  SetText(Mid.x + 16, WindowRect.Bottom, LBorder + 'Abort' + RBorder);
-  BGPen := LightGray;
+  SetLength(ButtonsArray, 5);
+  ButtonsArray[0].Rect := Rect(Mid.x - 22, WindowRect.Bottom, Mid.X - 17, WindowRect.Bottom + 1);
+  ButtonsArray[0].Pressed := False;
+  ButtonsArray[0].Title := 'Yes';
+  ButtonsArray[0].Result := mrOK;
+
+  ButtonsArray[1].Rect := Rect(Mid.x - 16, WindowRect.Bottom, Mid.x - 12, WindowRect.Bottom + 1);
+  ButtonsArray[1].Pressed := False;
+  ButtonsArray[1].Title := 'No';
+  ButtonsArray[1].Result := mrCancel;
+
+  ButtonsArray[2].Rect := Rect(Mid.x - 10, WindowRect.Bottom, Mid.x + 2, WindowRect.Bottom + 1);
+  ButtonsArray[2].Pressed := False;
+  ButtonsArray[2].Title := 'Yes to All';
+  ButtonsArray[2].Result := mrAll;
+
+  ButtonsArray[3].Rect := Rect(Mid.x + 3, WindowRect.Bottom, Mid.x + 14, WindowRect.Bottom + 1);
+  ButtonsArray[3].Pressed := False;
+  ButtonsArray[3].Title := 'No to All';
+  ButtonsArray[3].Result := mrNoAll;
+
+  ButtonsArray[4].Rect := Rect(Mid.x + 16, WindowRect.Bottom, Mid.x + 23, WindowRect.Bottom + 1);
+  ButtonsArray[4].Pressed := False;
+  ButtonsArray[4].Title := 'Abort';
+  ButtonsArray[4].Result := mrNoAll;
 end;
 
-procedure TAskMultipleQuestion.NextButton;
-begin
-  case ActiveButton of
-    mrOK: ActiveButton := mrCancel;
-    mrCancel: ActiveButton := mrAll;
-    mrAll: ActiveButton := mrNoAll;
-    mrNoAll: ActiveButton := mrAbort;
-    else
-      ;
-  end;
-  DrawButtons;
-  UpdateScreen(False);
-end;
-
-procedure TAskMultipleQuestion.PrevButton;
-begin
-  case ActiveButton of
-    mrCancel: ActiveButton := mrOK;
-    mrAll: ActiveButton := mrCancel;
-    mrNoAll: ActiveButton := mrAll;
-    mrAbort: ActiveButton := mrNoAll;
-    else
-      ;
-  end;
-  DrawButtons;
-  UpdateScreen(False);
-end;
 
 { TAskForNumber }
 
@@ -442,6 +414,7 @@ var
   t1: LongWord;
   Key: TKeyEvent;
 begin
+  CancelPressed := False;
   CurValue := AValue1;
   Text := NText1;
   CurValue2 := AValue2;
@@ -492,7 +465,7 @@ begin
   end;
   Key := PollNextKey;
   // Break on Enter -> Cancel
-  if (Key and $FFFF) = $1C0D then
+  if ((Key and $FFFF) = $1C0D) or CancelPressed then
     Result := False;
 
 end;
@@ -538,8 +511,19 @@ begin
   UpdateScreen(False);
 end;
 
+procedure TSingleProgress.ProcessMouse(MouseEvent: TMouseEvent);
+begin
+  if (MouseEvent.Action = MouseActionDown) and (MouseEvent.buttons = MouseLeftButton) then
+  begin
+    SetText(Mid.x - 4, WindowRect.Bottom, LBorder + 'Cancel' + RBorder);
+    if (MouseEvent.y = WindowRect.Bottom) and InRange(MouseEvent.x, Mid.x - 4, Mid.x + 4) then
+      CancelPressed := True;
+  end;
+end;
+
 function TSingleProgress.Execute: TDialogResult;
 begin
+  CancelPressed := False;
   Result := mrOK;
   {$WARNINGS OFF}
   LastCall := GetTickCount;
@@ -550,7 +534,7 @@ begin
   Paint;
 end;
 
-function TSingleProgress.UpdateValue(AValue: LongWord; NText: string = ''): boolean;
+function TSingleProgress.UpdateValue(AValue: LongWord; NText: string): Boolean;
 var
   x, w, p: LongInt;
   t1: LongWord;
@@ -588,7 +572,7 @@ begin
   end;
   Key := PollNextKey;
   // Break on Enter -> Cancel
-  if (Key and $FFFF) = $1C0D then
+  if ((Key and $FFFF) = $1C0D) or CancelPressed then
     Result := False;
 end;
 
@@ -604,22 +588,6 @@ end;
 function TAskForName.ValidInput(s: string): Boolean;
 begin
   Result := True;
-end;
-
-procedure TAskForName.DrawButtons;
-begin
-  FGPen := Black;
-  if ActiveButton = mrOK then
-    BGPen := Cyan
-  else
-    BGPen := LightGray;
-  SetText(Mid.x - 6, WindowRect.Bottom, LBorder + 'Ok' + RBorder);
-  if ActiveButton = mrCancel then
-    BGPen := Cyan
-  else
-    BGPen := LightGray;
-  SetText(Mid.x + 2, WindowRect.Bottom, LBorder + 'Cancel' + RBorder);
-  BGPen := LightGray;
 end;
 
 procedure TAskForName.Paint;
@@ -669,7 +637,6 @@ var
   p: LongInt;
   OldName: String;
 begin
-  ActiveButton := mrOK;
   Paint;
   repeat
     Key := PollNextKey;
@@ -683,7 +650,7 @@ begin
           SetCursorPos(CursorX + 1, CursorY);
       end;
       $1C0D: begin
-        Result := ActiveButton;
+        Result := ButtonsArray[SelectedButton].Result;
         Break;
       end;
       $011B: begin
@@ -691,14 +658,10 @@ begin
         Break;
       end;
       $0F09: begin
-        if ActiveButton = mrOK then
-          ActiveButton := mrCancel
-        else
-          ActiveButton := mrOK;
+        SelectedButton := (SelectedButton + 1) mod Length(ButtonsArray);
         FGPen := Black;
         BGPen := LightGray;
         DrawButtons;
-        UpdateScreen(False);
       end
       else
       begin
@@ -747,74 +710,40 @@ end;
 
 { TAskQuestion }
 
-procedure TAskQuestion.DrawButtons;
+procedure TAskQuestion.ConfigureButtons;
 begin
-  FGPen := Black;
-  if ActiveButton = mrOK then
-    BGPen := Cyan
-  else
-    BGPen := LightGray;
-  SetText(Mid.x - 6, WindowRect.Bottom, LBorder + 'Yes' + RBorder);
-  if ActiveButton = mrCancel then
-    BGPen := Cyan
-  else
-    BGPen := LightGray;
-  SetText(Mid.x + 2, WindowRect.Bottom, LBorder + 'No ' + RBorder);
-  BGPen := LightGray;
-end;
+  SetLength(ButtonsArray, 2);
+  ButtonsArray[0].Rect := Rect(Mid.x - 5, WindowRect.Bottom, Mid.X, WindowRect.Bottom + 1);
+  ButtonsArray[0].Pressed := False;
+  ButtonsArray[0].Title := 'Yes';
+  ButtonsArray[0].Result := mrOK;
 
-procedure TAskQuestion.NextButton;
-begin
-  if ActiveButton = mrOK then
-  begin
-    ActiveButton := mrCancel;
-    DrawButtons;
-    UpdateScreen(False);
-  end;
-end;
-
-procedure TAskQuestion.PrevButton;
-begin
-  if ActiveButton = mrCancel then
-  begin
-    ActiveButton := mrOK;
-    DrawButtons;
-    UpdateScreen(False);
-  end;
-end;
-
-function TAskQuestion.Execute: TDialogResult;
-var
-  Key: TKeyEvent;
-begin
-  ActiveButton := mrOK;
-  Result := mrOK;
-  Paint;
-  repeat
-    Key := PollNextKey;
-    case (Key and $FFFF) of
-      $1C0D, $000D: begin
-        Result := ActiveButton;
-        Break;
-      end;
-      $4B00, $34: PrevButton; // cursor left
-      $4D00, $36: NextButton; // cursor right
-      $011B: begin
-        Result := mrCancel;
-        Exit;
-      end;
-    end;
-    Sleep(25);
-  until False;
+  ButtonsArray[1].Rect := Rect(Mid.x + 3, WindowRect.Bottom, Mid.x + 7, WindowRect.Bottom + 1);
+  ButtonsArray[1].Pressed := False;
+  ButtonsArray[1].Title := 'No';
+  ButtonsArray[1].Result := mrCancel;
 end;
 
 { TBaseDialog }
 
+procedure TBaseDialog.ProcessMouse(MouseEvent: TMouseEvent);
+begin
+  // no default mouse event
+end;
+
 function TBaseDialog.PollNextKey: TKeyEvent;
+var
+  MouseEvent: TMouseEvent;
 begin
   Result := GetNextKeyEvent;
   if Result = ResizeKey then
+  begin
+    Result := 0;
     Paint;
+  end;
+  MouseEvent.Action := 0;
+  if GetNextMouseEvent(MouseEvent) then
+    ProcessMouse(MouseEvent);
 end;
 
 procedure TBaseDialog.DrawWindowBorder;
@@ -854,11 +783,32 @@ end;
 { TShowMessage }
 
 procedure TShowMessage.DrawButtons;
+var
+  i: Integer;
 begin
-  BGPen := Cyan;
+  if Length(ButtonsArray) = 0 then
+    ConfigureButtons;
   FGPen := Black;
-  SetText(Mid.x - 1, WindowRect.Bottom, LBorder + 'OK' + RBorder);
+  for i := 0 to High(ButtonsArray) do
+  begin
+    if SelectedButton = i then
+      BGPen := Cyan
+    else
+      BGPen := LightGray;
+    SetText(ButtonsArray[i].Rect.Left, ButtonsArray[i].Rect.Top, LBorder + ButtonsArray[i].Title + RBorder);
+  end;
   BGPen := LightGray;
+  UpdateScreen(False);
+end;
+
+procedure TShowMessage.ConfigureButtons;
+begin
+  //
+  SetLength(ButtonsArray, 1);
+  ButtonsArray[0].Rect := Rect(Mid.x, WindowRect.Bottom, Mid.x + 4, WindowRect.Bottom + 1);
+  ButtonsArray[0].Pressed := False;
+  ButtonsArray[0].Title := 'OK';
+  ButtonsArray[0].Result := mrOK;
 end;
 
 procedure TShowMessage.Paint;
@@ -869,6 +819,7 @@ var
   s,s1: string;
 begin
   inherited;
+  //
   SL := TStringList.Create;
   SL.Text := Text;
 
@@ -916,19 +867,71 @@ begin
   UpdateScreen(False);
 end;
 
+procedure TShowMessage.ProcessMouse(MouseEvent: TMouseEvent);
+var
+  i: Integer;
+begin
+  if (MouseEvent.Action = MouseActionDown) and (MouseEvent.buttons = MouseLeftButton) then
+  begin
+    for i := 0 to High(ButtonsArray) do
+    begin
+      if PtInRect(ButtonsArray[i].Rect, Point(MouseEvent.x, MouseEvent.y)) then
+      begin
+        if SelectedButton = i then
+          ButtonsArray[i].Pressed := True
+        else
+        begin
+          SelectedButton := i;
+          DrawButtons;
+        end;
+        Exit;
+      end;
+    end;
+  end;
+end;
+
 function TShowMessage.Execute: TDialogResult;
 var
   Key: TKeyEvent;
+  i: Integer;
 begin
+  SelectedButton := 0;
   Result := mrOK;
   Paint;
   repeat
     Key := PollNextKey;
+    for i := 0 to High(ButtonsArray) do
+    begin
+      if ButtonsArray[i].Pressed then
+      begin
+        Result := ButtonsArray[i].Result;
+        Exit;
+      end;
+    end;
     case (Key and $FFFF) of
-      $1C0D: Break;
+      $1C0D, $000D: begin
+        Result := ButtonsArray[SelectedButton].Result;
+        Break;
+      end;
+      $0F09: begin
+        SelectedButton := (SelectedButton + 1) mod Length(ButtonsArray);
+        DrawButtons;
+      end;
+      $4B00, $34: begin    // cursor left
+        SelectedButton := Max(SelectedButton - 1, 0);
+        DrawButtons;
+      end;
+      $4D00, $36: begin    // cursor right
+        SelectedButton := Min(SelectedButton + 1, High(ButtonsArray));
+        DrawButtons;
+      end;
+      $011B: begin
+        Result := mrCancel;
+        Exit;
+      end;
     end;
     Sleep(25);
-  until (Key and $ff00) = $0100;
+  until False;
 end;
 
 end.

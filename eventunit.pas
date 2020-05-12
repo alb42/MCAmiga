@@ -15,6 +15,7 @@ const
   ResizeKey = $FFFF0000;
 
 function GetNextKeyEvent: TKeyEvent;
+function GetNextMouseEvent(var MouseEvent: TMouseEvent): Boolean;
 
 
 procedure RunApp;
@@ -30,6 +31,13 @@ implementation
 var
   Terminated: Boolean = False;
 
+
+function GetNextMouseEvent(var MouseEvent: TMouseEvent): Boolean;
+begin
+  Result := PollMouseEvent(MouseEvent);
+  if Result then
+    GetMouseEvent(MouseEvent);
+end;
 
 function GetNextKeyEvent: TKeyEvent;
 var
@@ -59,9 +67,6 @@ begin
     Exit;
   end;
   {$endif}
-  // we got killed
-  if Terminated then
-    Exit;
 end;
 
 procedure ProcessMessages;
