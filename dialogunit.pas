@@ -162,6 +162,7 @@ procedure ShowViewHelp;
 procedure ShowMessage(AText: string);
 procedure NonWaitMessage(AText: string);
 
+
 implementation
 
 uses

@@ -286,13 +286,13 @@ procedure TFileViewer.SetCurrentByte(AValue: LongWord);
 begin
   if FCurrentByte = AValue then Exit;
   FCurrentByte := EnsureRange(AValue, 0, NumBytes);
-  while FCurrentByte >= (FStartLine + (ScreenHeight - 1)) * NumBytesPerLine do
+  while FCurrentByte >= ((FStartLine + (Int64(ScreenHeight) - 1))) * NumBytesPerLine do
   begin
     if StartLine >= NumBytes div NumBytesPerLine - 1 then
       Break;
     Inc(FStartLine);
   end;
-  while FCurrentByte < FStartLine * NumBytesPerLine - 1 do
+  while FCurrentByte < Int64(FStartLine) * NumBytesPerLine - 1 do
   begin
     if FStartLine = 0 then
       Break;
@@ -400,6 +400,7 @@ var
   AbsOffset: LongWord;
   Found: Boolean;
 begin
+  sa := [];
   SetLength(sa, 10);
   Idx := 0;
   while Length(Searchstring) > 0 do
@@ -437,7 +438,7 @@ begin
       end;
       // found!
       Inc(Pl, Offset + 1);
-      AbsOffset := AbsOffset + Offset + 1;
+      AbsOffset := AbsOffset + LongWord(Offset + 1);
       Found := True;
       Pl2 := Pl;
       for j := 1 to High(sa) do

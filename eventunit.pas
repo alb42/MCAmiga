@@ -9,6 +9,7 @@ uses
 
 type
   TOnKeyPress = procedure(Key: TKeyEvent);
+  TOnMouseEvent = procedure(Me: TMouseEvent);
   TOnResize = procedure(NewWidth, NewHeight: Integer);
 
 const
@@ -23,6 +24,7 @@ procedure Terminate;
 
 var
   OnKeyPress: TOnKeyPress = nil;
+  OnMouseEvent: TOnMouseEvent = nil;
   OnResize: TONResize = nil;
   OnIdle: TProcedure = nil;
 
@@ -72,17 +74,19 @@ end;
 procedure ProcessMessages;
 var
   ev: TKeyEvent;
+  me: TMouseEvent;
 begin
   ev := GetNextKeyEvent;
-  if (ev <> 0) and Assigned(OnKeyPress) then
-  begin
-    try
+  try
+    if (ev <> 0) and Assigned(OnKeyPress) then
       OnKeyPress(ev);
-    except
-      on e: Exception do
-      begin
-        writeln('Exception: ', e.message);
-      end;
+    me.Action := 0;
+    if GetNextMouseEvent(me) and Assigned(OnMouseEvent) then
+      OnMouseEvent(me);
+  except
+    on e: Exception do
+    begin
+      writeln('Exception: ', e.message);
     end;
   end;
 end;

@@ -8,7 +8,7 @@ uses
   {$ifdef HASAMIGA}
   AmigaDOS, Exec,
   {$endif}
-  Video, Keyboard, Classes, SysUtils, Math, fgl, StrUtils;
+  Video, Keyboard, Classes, SysUtils, Math, fgl, StrUtils, Mouse;
 
 const
   UpperLeftEdge = #201;
@@ -60,10 +60,13 @@ type
   end;
 
 
+  TMouseSelMode = (msNone, msSelect, msDeselect);
+
   { TFileList }
 
   TFileList = class
   private
+    FMouseSelMode: TMouseSelMode;
     FRect: TRect;
     FInnerRect: TRect;
     FCurrentPath: string;
@@ -116,10 +119,13 @@ type
 
     procedure SelectByPattern(DoSelect: Boolean);
 
+    procedure MouseEvent(Me: TMouseEvent);
+
     property CurrentPath: string read FCurrentPath write SetCurrentPath;
     property IsActive: Boolean read FIsActive write SetIsActive;
     property ActiveElement: Integer read FActiveElement write SetActiveElement;
     property ActiveEntry: TListEntry read GetActiveEntry;
+    property PanelRect: TRect read FRect;
   end;
 
 
@@ -598,6 +604,7 @@ end;
 constructor TFileList.Create(ARect: TRect);
 begin
   inherited Create;
+  FMouseSelMode := msNone;
   FActiveElement := -1;
   FTopElement := -1;
   FBottomElement := -1;
@@ -1115,6 +1122,53 @@ begin
       end;
     end;
     CheckSelected;
+  end;
+end;
+
+procedure TFileList.MouseEvent(Me: TMouseEvent);
+var
+  l: Integer;
+begin
+  l := (me.y - 1) + FTopElement;
+  case Me.Action of
+    MouseActionDown:
+      begin
+        if ME.buttons = MouseLeftButton then
+        begin
+          if not InRange(l, 0, FFileList.Count - 1) then
+            Exit;
+          if ActiveElement = l then
+            EnterPressed
+          else
+            ActiveElement := l;
+          Exit;
+        end;
+        if ME.buttons = MouseRightButton then
+        begin
+          if not InRange(l, 0, FFileList.Count - 1) then
+            Exit;
+          FFileList[l].Selected := not FFileList[l].Selected;
+          if FFileList[l].Selected then
+            FMouseSelMode := msSelect
+          else
+            FMouseSelMode := msDeselect;
+          Update(False);
+          Exit;
+        end;
+        Exit;
+      end;
+    MouseActionMove:
+      begin
+        if not InRange(l, 0, FFileList.Count - 1) then
+          Exit;
+        if FMouseSelMode = msSelect then
+          FFileList[l].Selected := True
+        else
+          if FMouseSelMode = msDeselect then
+            FFileList[l].Selected := False;
+        Update(False);
+      end;
+    MouseActionUp: FMouseSelMode := msNone;
   end;
 end;
 

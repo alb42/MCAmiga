@@ -4,7 +4,7 @@ uses
   {$ifdef HASAMIGA}
   Exec, workbench, icon,
   {$endif}
-  Types, SysUtils, Video, mouse, keyboard, FileListUnit, dialogunit, EventUnit, viewerunit;
+  Types, SysUtils, Video, mouse, keyboard, FileListUnit, dialogunit, EventUnit;
 
 const
   AFF_68080 = 1 shl 10;
@@ -29,6 +29,33 @@ begin
   Temp := Dest;
   Dest := Src;
   Src := Temp;
+  Src.IsActive := True;
+  Dest.IsActive := False;
+end;
+
+procedure MouseEvent(Me: TMouseEvent);
+var
+  P: TPoint;
+begin
+  if me.Action = MouseActionDown then
+  begin
+    P := Point(Me.x, Me.y);
+    if Left.PanelRect.Contains(P) then
+    begin
+      if Right.IsActive then
+        SwapSrcDest;
+      Left.MouseEvent(Me);
+    end
+    else
+      if Right.PanelRect.Contains(P) then
+      begin
+        if Left.IsActive then
+          SwapSrcDest;
+        Right.MouseEvent(Me);
+      end;
+  end
+  else
+    Src.MouseEvent(Me);
 end;
 
 procedure KeyEvent(Ev: TKeyEvent);
@@ -40,8 +67,6 @@ begin
   case TranslateKeyEvent(Ev) and $ffff of
     $0F09: begin                                               // TAB -> change Focus to other window
       SwapSrcDest;
-      Src.IsActive := True;
-      Dest.IsActive := False;
     end;
     $0008: Src.GoToParent;                                     // Backspace -> Parent
     $1C0D, $000D: begin
@@ -227,6 +252,7 @@ begin
   GetSettings;
 
   OnKeyPress := @KeyEvent;
+  OnMouseEvent := @MouseEvent;
   OnResize := @ResizeEvent;
   OnIdle := @IdleEvent;
 
