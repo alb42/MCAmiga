@@ -1,7 +1,7 @@
 program MCAmiga;
 {$mode objfpc}{$H+}
 uses
-  {$ifdef AMIGA68k}
+  {$ifdef HASAMIGA}
   Exec, workbench, icon,
   {$endif}
   Types, SysUtils, Video, mouse, keyboard, FileListUnit, dialogunit, EventUnit, viewerunit;
@@ -253,7 +253,7 @@ begin
 end;
 
 const
-  VERSION = '$VER: MCAmiga 0.2 (10.05.2020)';
+  VERSION = '$VER: MCAmiga 0.3 (11.05.2020)';
 
 begin
   {$ifdef AMIGA68k}
@@ -267,7 +267,7 @@ begin
   InitMouse;
   InitKeyboard;
   {$ifdef HASAMIGA}
-  Video.SetWindowTitle('MyCommander Amiga 0.2', VERSION);
+  Video.SetWindowTitle('MyCommander Amiga 0.3', VERSION);
   {$endif}
 
   StartMe;

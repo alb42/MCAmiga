@@ -1,7 +1,6 @@
 MyCommander for Amiga,AmigaOS4,AROS,MorphOS
 -------------------------------------------
 
-
 Midnight/Norton commander style file manager for all Amiga systems.
 
 Keys:
@@ -36,10 +35,10 @@ INS, 0, Space, # - De-/Select item at cursor
 Operations:
 -----------
 
-F3       - View
+F3       - View                      Shift F3 - Alternative View
+F4       - Edit                      Shift F4 - Alternative Edit
 F5       - Copy
-F6       - Move
-Shift F6 - Rename file under cursor
+F6       - Move                      Shift F6 - Rename file under cursor
 F7       - Create directory
 F8       - Delete
 
@@ -49,3 +48,16 @@ General:
 F1       - Help
 F10, ESC - Quit
 Ctrl + R - Rescan current directory
+
+
+Tooltypes:
+##########
+
+VIEWER=   Viewer for F3, Empty = internal viewer
+VIEWER2=  Viewer for Shift F3, Empty = internal viewer
+EDITOR=   Editor for F4
+EDITOR2=  Editor for Shift F4
+
+LEFT=     Startup path for left panel
+RIGHT=    Startup path for right panel
+
