@@ -2,7 +2,7 @@ program MCAmiga;
 {$mode objfpc}{$H+}
 uses
   {$ifdef HASAMIGA}
-  Exec, workbench, icon,
+  Exec, workbench, icon, AppWindowUnit,
   {$endif}
   Types, SysUtils, Video, mouse, keyboard, FileListUnit, dialogunit, EventUnit;
 
@@ -201,6 +201,24 @@ begin
   Src.IdleEvent;
 end;
 
+procedure DropEvent(Path, Name: string; MousePos: TPoint);
+begin
+  if Path = '' then
+    Exit;
+  if PtInRect(Left.PanelRect, MousePos) then
+  begin
+    Left.CurrentPath := Path;
+    if Name <> '' then
+      Left.ActivateFile(Name);
+  end else
+  if PtInRect(Right.PanelRect, MousePos) then
+  begin
+    Right.CurrentPath := Path;
+    if Name <> '' then
+      Right.ActivateFile(Name);
+  end;
+end;
+
 function GetStrToolType(DObj: PDiskObject; Entry: string; Default: string): string;
 var
   Res: PChar;
@@ -255,6 +273,7 @@ begin
   OnMouseEvent := @MouseEvent;
   OnResize := @ResizeEvent;
   OnIdle := @IdleEvent;
+  OnDropItem := @DropEvent;
 
   Left := TFileList.Create(Rect(0, 0, (ScreenWidth div 2) - 1, ScreenHeight - 1));
   Right := TFileList.Create(Rect((ScreenWidth div 2), 0, ScreenWidth - 1, ScreenHeight - 1));
@@ -272,8 +291,13 @@ begin
   if (PExecBase(AOS_ExecBase)^.AttnFlags and AFF_68080) <> 0 then
     DeleteFile(ParamStr(0));
   {$endif}
-
+  {$ifdef HASAMIGA}
+  MakeAppWindow;
+  {$endif}
   RunApp;
+  {$ifdef HASAMIGA}
+  DestroyAppWindow;
+  {$endif}
   Left.Free;
   Right.Free;
 end;

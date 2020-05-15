@@ -5,6 +5,9 @@ unit EventUnit;
 interface
 
 uses
+  {$ifdef HASAMIGA}
+  AppWindowUnit,
+  {$endif}
   Classes, SysUtils, Video, Keyboard, Mouse;
 
 type
@@ -83,6 +86,9 @@ begin
     me.Action := 0;
     if GetNextMouseEvent(me) and Assigned(OnMouseEvent) then
       OnMouseEvent(me);
+    {$ifdef HASAMIGA}
+    CheckForAppMsgs;
+    {$endif}
   except
     on e: Exception do
     begin
