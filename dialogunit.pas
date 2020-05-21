@@ -586,7 +586,7 @@ end;
 function TAskForName.IsValidChar(c: Char): Boolean;
 begin
   Result := c in ['a'..'z','A'..'Z','-','.','_','0'..'9',' '];
-  if not AsName and (c = '*') then
+  if not AsName and (InRange(Ord(c), 26, 126)) then
     Result := True;
 end;
 

@@ -231,7 +231,10 @@ begin
 end;
 
 procedure StartMe;
+var
+  Mode: TVideoMode;
 begin
+  LockScreenUpdate;
   {$ifdef HASAMIGA}
   LeftDefaultPath := 'sys:';
   RightDefaultPath := 'ram:';
@@ -240,7 +243,6 @@ begin
   LeftDefaultPath := '/';
   RightDefaultPath := '/usr/bin';
   {$endif}
-
   GetSettings;
 
   OnKeyPress := @KeyEvent;
@@ -259,8 +261,15 @@ begin
   Src := Left;
   Dest := Right;
 
+  Mode.Col := 0;
+  Video.GetVideoMode(Mode);
+  Video.SetVideoMode(Mode);
+
   Left.CurrentPath := LeftDefaultPath;
   Right.CurrentPath := RightDefaultPath;
+
+  UnlockScreenUpdate;
+  UpdateScreen(True);
 
   Right.ActiveElement := 0;
   Left.IsActive := True;

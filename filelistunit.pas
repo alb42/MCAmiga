@@ -120,6 +120,7 @@ type
     procedure DrawEntry(Idx: Integer);
 
     procedure ExtractSelectedFiles;
+    procedure PackSelectedFiles;
 
     procedure DoListOfSelectedFile(Recursive: Boolean; FL: TEntryList; out Dirs: integer; out Files: Integer; out Size: Int64);
 
@@ -138,11 +139,11 @@ type
     function CheckForArchiveEnter(AName: string): Boolean;
     function ResultOfEntry(out NewPath: string): Boolean;
 
-    procedure CopyFiles; // F5
-    procedure MoveFiles; // F6
-    procedure MakeDir; // F7
+    procedure CopyFiles;      // F5
+    procedure MoveFiles;      // F6
+    procedure MakeDir;        // F7
     procedure DeleteSelected; // F8
-    procedure Rename; // Shift F6
+    procedure Rename;         // Shift F6
 
     procedure ActivateFile(AName: string);
     procedure SelectActiveEntry;
@@ -600,7 +601,7 @@ begin
     l := Length(s);
     if l > FInnerRect.Width then
     begin
-      s := Copy(s, 1 + ActShowStart, FInnerRect.Width - 1);
+      s := Copy(s, 1 + ActShowStart, FInnerRect.Width);
       l := Length(s);
     end;
     SetText(FInnerRect.Left, FRect.Bottom - 1, s);
@@ -740,7 +741,7 @@ begin
             CreateDir(ExcludeTrailingPathDelimiter(IncludeTrailingPathDelimiter(Target) + SrcName));
           if FL[i].EType = etFile then
           begin
-            cmd := 'c:lha e ' + FArchiveName + ' ' + BasePath + FL[i].Name  + ' ' +TempName;
+            cmd := 'c:lha e "' + FArchiveName + '" "' + BasePath + FL[i].Name  + '" ' +TempName;
             SystemTags(PChar(cmd), [TAG_END]);
             if FileExists(TempName + BasePath + FL[i].Name) then
             begin
@@ -764,6 +765,90 @@ begin
   end;
 end;
 
+procedure CreateAllDir(AName: string);
+var
+  SL: TStringList;
+  Name: string;
+  i: Integer;
+begin
+  SL := TStringList.Create;
+  ExtractStrings(['/'], [], PChar(AName), SL);
+  Name := '';
+  for i := 0 to SL.Count - 1 do
+  begin
+    if Name = '' then
+      Name := SL[i]
+    else
+      Name := IncludeTrailingPathDelimiter(Name) + SL[i];
+    if not FileExists(Name) then
+      CreateDir(Name);
+  end;
+  SL.Free;
+end;
+
+procedure TFileList.PackSelectedFiles;
+const
+  BufferSize = 1024 * 1024;
+var
+  Buffer: Pointer;
+  BasePath, Source, TempName, SrcName, cmd: string;
+  FL: TEntryList;
+  Dirs, Files, i, ReadBytes: integer;
+  Size: Int64;
+  SF, DF: TFileStream;
+begin
+  Buffer := nil;
+  //
+  Source := IncludeTrailingPathDelimiter(CurrentPath);
+  //
+  TempName := 'T:';// must use the base or it will not put into the right directory... the "homedirectory" of lha seems not to work as I guessed
+
+  Buffer := AllocMem(BufferSize);
+  // get BasePath
+  BasePath := IncludeTrailingPathDelimiter(Copy(OtherSide.CurrentPath, Pos(#10, OtherSide.CurrentPath) + 2, Length(OtherSide.CurrentPath)));
+  FL := TEntryList.Create(True);
+  try
+    DoListOfSelectedFile(True, FL, Dirs, Files, Size);
+    if FL.Count > 0 then
+    begin
+      if AskQuestion('Pack ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files (' + Trim(FormatSize(Size))  + 'byte)'#13#10 + OtherSide.FArchiveName + '? ') then
+      begin
+        CreateAllDir(TempName + ExcludeTrailingPathDelimiter(BasePath));
+        for i := 0 to FL.Count - 1 do
+        begin
+          SrcName := FL[i].Name;
+          if FL[i].EType = etDir then
+            CreateDir(TempName + BasePath + SrcName);
+          if FL[i].EType = etFile then
+          begin
+            if FileExists(Source + FL[i].Name) then
+            begin
+              DF := TFileStream.Create(TempName + BasePath + FL[i].Name, fmCreate);
+              SF := TFileStream.Create(Source + FL[i].Name, fmOpenRead);
+              repeat
+                ReadBytes := SF.Read(Buffer^, BufferSize);
+                DF.Write(Buffer^, ReadBytes);
+              until ReadBytes = 0;
+              SF.Free;
+              DF.Free;
+            end;
+            cmd := 'c:lha a "' + OtherSide.FArchiveName + '" "' + TempName + BasePath + FL[i].Name + '"';
+            SystemTags(PChar(cmd), [TAG_END]);
+          end;
+        end;
+      end;
+      OtherSide.FArchiveDir.Free;
+      OtherSide.FArchiveDir := nil;
+      OtherSide.CheckForArchiveEnter(OtherSide.FArchiveName);
+      OtherSide.Update(True);
+    end;
+  finally
+    DeleteAll(TempName + ExcludeTrailingPathDelimiter(BasePath));
+    FL.Free;
+    FreeMem(Buffer);
+  end;
+
+end;
 
 function ListCompare(const Item1, Item2: TListEntry): Integer;
 begin
@@ -955,6 +1040,7 @@ var
   IsDir: Boolean;
   CDir: TArchiveDir;
   AE: TArchiveEntry;
+  cmd: string;
 begin
   Result := False;
   if InArchive then
@@ -965,7 +1051,8 @@ begin
   begin
     TempName := GetTempFileEvent('t:', '.mcamiga');
     Outfile := DOSOpen(PChar(TempName), MODE_NEWFILE);
-    Systemtags(PChar('c:lha vv ' + AName), [SYS_Output, AsTag(Outfile), TAG_END]);
+    cmd := 'c:lha vv "' + AName + '"';
+    Systemtags(PChar(cmd), [SYS_Output, AsTag(Outfile), TAG_END]);
     DosClose(OutFile);
     SL := TStringList.Create;
     SL.LoadFromFile(TempName);
@@ -980,6 +1067,7 @@ begin
     if CurPos < 0 then
     begin
       writeln('listing not found');
+      writeln(cmd);
       writeln(SL.Text);
       Exit;
     end;
@@ -1693,6 +1781,16 @@ begin
   begin
     try
       ExtractSelectedFiles;
+    except
+    end;
+    Update(False);
+    OtherSide.Update(True);
+    Exit;
+  end;
+  if OtherSide.InArchive then
+  begin
+    try
+      PackSelectedFiles;
     except
     end;
     Update(False);
