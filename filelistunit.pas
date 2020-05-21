@@ -811,7 +811,7 @@ begin
     DoListOfSelectedFile(True, FL, Dirs, Files, Size);
     if FL.Count > 0 then
     begin
-      if AskQuestion('Pack ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files (' + Trim(FormatSize(Size))  + 'byte)'#13#10 + OtherSide.FArchiveName + '? ') then
+      if AskQuestion('Pack ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files (' + Trim(FormatSize(Size))  + 'byte)'#13#10 +'to ' + OtherSide.FArchiveName + '? ') then
       begin
         CreateAllDir(TempName + ExcludeTrailingPathDelimiter(BasePath));
         for i := 0 to FL.Count - 1 do
@@ -832,6 +832,10 @@ begin
               SF.Free;
               DF.Free;
             end;
+            // try to delete file in archive first (or we have 2 files)
+            cmd := 'c:lha d "' + OtherSide.FArchiveName + '" "' + BasePath + FL[i].Name + '"';
+            SystemTags(PChar(cmd), [TAG_END]);
+            // pack the file to the archive
             cmd := 'c:lha a "' + OtherSide.FArchiveName + '" "' + TempName + BasePath + FL[i].Name + '"';
             SystemTags(PChar(cmd), [TAG_END]);
           end;
@@ -1243,13 +1247,15 @@ begin
       AE := CDir.Entries[i];
       if AE is TArchiveFile then
       begin
-        FL.AddFile(IncludeTrailingPathDelimiter(AName) + AE.Name, TArchiveFile(AE).Size);
+        if Assigned(FL) then
+          FL.AddFile(IncludeTrailingPathDelimiter(AName) + AE.Name, TArchiveFile(AE).Size);
         Size := Size + TArchiveFile(AE).Size;
         Inc(Files);
       end;
       if AE is TArchiveDir then
       begin
-        FL.AddDir(IncludeTrailingPathDelimiter(AName) + AE.Name);
+        if Assigned(FL) then
+          FL.AddDir(IncludeTrailingPathDelimiter(AName) + AE.Name);
         Inc(Dirs);
         RecurseDirsArchive(ABasePath, IncludeTrailingPathDelimiter(ExcludeLeadingPathDelimiter(AName)) + AE.Name, FArchiveDir, FL, Dirs, Files, Size);
       end;
@@ -1427,16 +1433,36 @@ end;
 
 procedure TFileList.Rename();
 var
-  NewName: string;
+  NewName, OldName, BasePath, cmd: string;
 begin
   if InRange(FActiveElement, 0, FFileList.Count - 1) then
   begin
     if FFileList[FActiveElement].EType in [etDir, etFile] then
     begin
       NewName := ExcludeTrailingPathDelimiter(FFileList[FActiveElement].Name);
+      OldName := NewName;
       if AskForName('New name for "' + NewName + '"', NewName,  True) then
       begin
-        SysUtils.RenameFile(IncludeTrailingPathDelimiter(FCurrentPath) + ExcludeTrailingPathDelimiter(FFileList[FActiveElement].Name), IncludeTrailingPathDelimiter(FCurrentPath) + NewName);
+        if NewName <> OldName then
+        begin
+          if InArchive then
+          begin
+            BasePath := IncludeTrailingPathDelimiter(Copy(FCurrentPath, Pos(#10, FCurrentPath) + 2, Length(FCurrentPath)));
+            cmd := 'c:lha e "' + FArchiveName + '" "' + BasePath + FFileList[FActiveElement].Name  + '" T:';
+            SystemTags(PChar(cmd), [TAG_END]);
+            cmd := 'c:lha d "' + FArchiveName + '" "' + BasePath + FFileList[FActiveElement].Name  + '"';
+            SystemTags(PChar(cmd), [TAG_END]);
+            SysUtils.RenameFile('T:' + BasePath + OldName, 'T:' + BasePath + NewName);
+            cmd := 'c:lha a "' + FArchiveName + '" "T:' + BasePath + NewName  + '"';
+            SystemTags(PChar(cmd), [TAG_END]);
+            DeleteAll('T:');
+            FArchiveDir.Free;
+            FArchiveDir := nil;
+            CheckForArchiveEnter(FArchiveName);
+          end
+          else
+            SysUtils.RenameFile(IncludeTrailingPathDelimiter(FCurrentPath) + OldName, IncludeTrailingPathDelimiter(FCurrentPath) + NewName);
+        end;
         Update(True);
       end
       else
@@ -1483,7 +1509,10 @@ begin
       Dirs := 0;
       Files := 0;
       Size := 0;
-      RecurseDirs(FCurrentPath, FFileList[FActiveElement].Name, nil, Dirs, Files, Size);
+      if InArchive then
+        RecurseDirsArchive(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name, '', FArchiveDir, nil, Dirs, Files, Size)
+      else
+        RecurseDirs(IncludeTrailingPathDelimiter(FCurrentPath), FFileList[FActiveElement].Name, nil, Dirs, Files, Size);
       FFileList[FActiveElement].Size := Size;
     end;
   end;
@@ -1598,14 +1627,23 @@ end;
 
 procedure TFileList.ViewFile(OpenWithProgram: string = '');
 var
-  FileN: string;
+  FileN, BasePath, TempName, cmd: string;
   Ret: Integer;
 begin
   if InRange(FActiveElement, 0, FFileList.Count - 1) then
   begin
     if FFileList[FActiveElement].EType = etFile then
     begin
-      FileN := IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name;
+      if InArchive then
+      begin
+        BasePath := IncludeTrailingPathDelimiter(Copy(FCurrentPath, Pos(#10, FCurrentPath) + 2, Length(FCurrentPath)));
+        TempName := 'T:' + BasePath + FFileList[FActiveElement].Name;
+        cmd := 'c:lha e "' + FArchiveName + '" "' + BasePath + FFileList[FActiveElement].Name  + '" T:';
+        SystemTags(PChar(cmd), [TAG_END]);
+        FileN := TempName;
+      end
+      else
+        FileN := IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name;
       if OpenWithProgram = '' then
         FileViewer(FileN)
       else
@@ -1615,6 +1653,8 @@ begin
         if Ret <> 0 then
           ShowMessage(OpenWithProgram + ' returned with error message: ' + IntToStr(Ret));
       end;
+      if InArchive then
+        DeleteAll('T:');
       Update(False);
       OtherSide.Update(False);
     end;
@@ -1623,14 +1663,24 @@ end;
 
 procedure TFileList.EditFile(OpenWithProgram: string = '');
 var
-  FileN: string;
+  FileN, BasePath, TempName, cmd: string;
   Ret: Integer;
 begin
+  Ret := 0;
   if InRange(FActiveElement, 0, FFileList.Count - 1) then
   begin
     if FFileList[FActiveElement].EType = etFile then
     begin
-      FileN := IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name;
+      if InArchive then
+      begin
+        BasePath := IncludeTrailingPathDelimiter(Copy(FCurrentPath, Pos(#10, FCurrentPath) + 2, Length(FCurrentPath)));
+        TempName := 'T:' + BasePath + FFileList[FActiveElement].Name;
+        cmd := 'c:lha e "' + FArchiveName + '" "' + BasePath + FFileList[FActiveElement].Name  + '" T:';
+        SystemTags(PChar(cmd), [TAG_END]);
+        FileN := TempName;
+      end
+      else
+        FileN := IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name;
       if OpenWithProgram = '' then
         ShowMessage('No Editor set')
       else
@@ -1639,8 +1689,19 @@ begin
         NonWaitMessage('Starting ' + ExtractFileName(OpenWithProgram));
         Ret := ExecuteProcess(OpenWithProgram, [FileN]);
         if Ret <> 0 then
+        begin
           ShowMessage(OpenWithProgram + ' returned with error message: ' + IntToStr(Ret));
+        end
+        else
+        begin
+          cmd := 'c:lha d "' + FArchiveName + '" "' + BasePath + FFileList[FActiveElement].Name  + '"';
+          SystemTags(PChar(cmd), [TAG_END]);
+          cmd := 'c:lha a "' + FArchiveName + '" "T:' + BasePath + FFileList[FActiveElement].Name  + '"';
+          SystemTags(PChar(cmd), [TAG_END]);
+        end;
       end;
+      if InArchive then
+        DeleteAll('T:');
       Update(True);
       OtherSide.Update(False);
     end;
