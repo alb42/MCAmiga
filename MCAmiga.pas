@@ -139,8 +139,8 @@ begin
         Right.Update(False);
       end;
     end
-    else
-    //  Debug('Key: $' + HexStr(TranslateKeyEvent(Ev), 4));
+    //else
+    //  if (ev and $FFFF) <> 0 then writeln('Key: $' + HexStr(TranslateKeyEvent(Ev), 4));
   end;
 end;
 
@@ -288,9 +288,6 @@ begin
   Right.Free;
 end;
 
-const
-  VERSION = '$VER: MCAmiga 0.4 (15.05.2020)';
-
 begin
   {$ifdef RELEASE}
   DoVersionInformation;
@@ -299,7 +296,7 @@ begin
   InitMouse;
   InitKeyboard;
   {$ifdef HASAMIGA}
-  Video.SetWindowTitle('MyCommander Amiga 0.4', VERSION);
+  Video.SetWindowTitle('MyCommander Amiga ' + NumVERSION, Copy(VERSION, 6, 12));
   {$endif}
 
   StartMe;

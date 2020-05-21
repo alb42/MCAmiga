@@ -8,19 +8,8 @@ uses
   Types, Classes, SysUtils, Video, Keyboard, Mouse, Math, EventUnit;
 
 const
-  URCorner = #191;
-  LLCorner = #192;
-  ULCorner = #218;
-  LRCorner = #217;
-  HLine = #196;
-  VLine = #179;
-
-  RBorder = #195;
-  LBorder = #180;
-
-  ProgressEmpty = #176;
-  ProgressHalf = #221;
-  ProgressFull = #219;
+  NumVERSION = '0.5';
+  VERSION = '$VER: MCAmiga 0.5 (21.05.2020)';
 
 type
                 //yes     no,    yes to All    No to all      Abort   None
@@ -168,12 +157,28 @@ implementation
 uses
   FileListUnit;
 
+const
+  URCorner = #191;
+  LLCorner = #192;
+  ULCorner = #218;
+  LRCorner = #217;
+  HLine = #196;
+  VLine = #179;
+
+  RBorder = #195;
+  LBorder = #180;
+
+  ProgressEmpty = #176;
+  ProgressHalf = #221;
+  ProgressFull = #219;
+
+
 const        //.........1.........2.........3.........4.........5........6.........7
   F2MenuText1 = ' pack current folder as lha';
 
 
 const       //.........1.........2.........3.........4.........5........6.........7
-  HelpText = '     MyCommander Amiga Version 0.4 '+{$INCLUDE %FPCTARGETCPU%} + '-' + {$INCLUDE %FPCTARGETOS%} +'  '#13#10 +
+  HelpText = '     MyCommander Amiga Version ' + NumVERSION + ' '+{$INCLUDE %FPCTARGETCPU%} + '-' + {$INCLUDE %FPCTARGETOS%} +'  '#13#10 +
              '   =================================================  '#13#10 +
              ' F1  - Help              Ins  - Select File'#13#10 +
              ' F3  - View              +    - Select by pattern'#13#10 +
