@@ -4,10 +4,11 @@ uses
   {$ifdef HASAMIGA}
   Exec, workbench, icon, AppWindowUnit,
   {$endif}
+  {$ifdef RELEASE}
+  Versioncheck,
+  {$endif}
   Types, SysUtils, Video, mouse, keyboard, FileListUnit, dialogunit, EventUnit;
 
-const
-  AFF_68080 = 1 shl 10;
 var
   Src: TFileList;
   Dest: TFileList;
@@ -20,6 +21,7 @@ var
 
   LeftDefaultPath: string = '';
   RightDefaultPath: string = '';
+
 
 
 procedure SwapSrcDest;
@@ -61,23 +63,12 @@ end;
 procedure KeyEvent(Ev: TKeyEvent);
 var
   st: Byte;
-  s: string;
 begin
   st := GetKeyEventShiftState(Ev);
   case TranslateKeyEvent(Ev) and $ffff of
-    $0F09: begin                                               // TAB -> change Focus to other window
-      SwapSrcDest;
-    end;
+    $0F09: SwapSrcDest;                                        // TAB -> change Focus to other window
     $0008: Src.GoToParent;                                     // Backspace -> Parent
-    $1C0D, $000D: begin
-      if st and kbShift <> 0 then                              // return -> Enter Dir/Assign/Drive
-      begin
-        if Src.ResultOfEntry(s) then
-          Dest.CurrentPath := s;
-      end
-      else
-        Src.EnterPressed;
-    end;
+    $1C0D, $000D: Src.EnterPressed(st and kbShift <> 0);      // return -> Enter Dir/Assign/Drive
     kbdUp, $38: Src.ActiveElement := Src.ActiveElement - 1;    // cursor up -> Move around
     kbdDown, $32: Src.ActiveElement := Src.ActiveElement + 1;  // cursor down -> Move around
     kbdPgUp, $39: Src.ActiveElement := Src.ActiveElement - 10; // pg up -> Move around
@@ -98,19 +89,14 @@ begin
       else
         Src.SelectActiveEntry;   // Insert, #, 0, Space -> Select file
     end;
-    $002B: begin
-      Src.SelectByPattern(True);                       // + -> Select files by pattern
-      Left.Update(False);
-      Right.Update(False);
-    end;
-    $002D: begin
-      Src.SelectByPattern(False);                      // - -> Deselect files by pattern
-      Left.Update(False);
-      Right.Update(False);
-    end;
+    $002B: Src.SelectByPattern(True);                       // + -> Select files by pattern
+    $002D: Src.SelectByPattern(False);                      // - -> Deselect files by pattern
     kbdF10, $011B: begin                               // F10, ESC -> Quit
       if AskQuestion('Quit Program') then
+      begin
         Terminate;
+        Exit;
+      end;
       Left.Update(False);
       Right.Update(False);
     end;
@@ -119,43 +105,22 @@ begin
         Src.ViewFile(AltViewerLink)
       else
         Src.ViewFile(ViewerLink);
-      Src.Update(False);
-      Dest.Update(False);
     end;
     kbdF4: begin                                      // F4 -> Edit
       if st and kbShift <> 0 then
         Src.EditFile(AltEditLink)
       else
         Src.EditFile(EditLink);
-      Src.Update(True);
-      Dest.Update(False);
     end;
-    kbdF5: begin                                      // F5 -> Copy/CopyAs
-      Src.CopyFiles(Dest.CurrentPath);
-      Src.Update(False);
-      Dest.Update(True);
-    end;
-    kbdF6: begin                                      // F6 -> Move/Rename
+    kbdF5: Src.CopyFiles;                            // F5 -> Copy/CopyAs
+    kbdF6: begin                                     // F6 -> Move/Rename
       if st and kbShift <> 0 then
         Src.Rename()
       else
-      begin
-        Src.MoveFiles(Dest.CurrentPath);
-        Dest.Update(True);
-      end;
-      Left.Update(False);
-      Right.Update(False);
+        Src.MoveFiles;
     end;
-    kbdF7: begin                                      // F7 -> MakeDir
-      Src.MakeDir();
-      Left.Update(False);
-      Right.Update(False);
-    end;
-    kbdF8, kbdDelete: begin                           // F8 -> Delete
-      Src.DeleteSelected();
-      Left.Update(False);
-      Right.Update(False);
-    end;
+    kbdF7:  Src.MakeDir();                           // F7 -> MakeDir
+    kbdF8, kbdDelete: Src.DeleteSelected();          // F8 -> Delete
     kbdF2: begin                                     // F2
       if ((st and kbAlt) <> 0) or ((st and kbCtrl) <> 0) then
       begin
@@ -179,17 +144,22 @@ begin
   end;
 end;
 
+var
+  MySize: TSize;
+
 procedure ResizeEvent(NewWidth, NewHeight: Integer);
 var
   Mode: TVideoMode;
 begin
-  if (NewWidth > 0) and (NewHeight > 0) and ((NewWidth <> ScreenWidth) or (NewHeight <> ScreenHeight)) then
+  if (NewWidth > 0) and (NewHeight > 0) and ((NewWidth <> MySize.cx) or (NewHeight <> MySize.cy)) then
   begin
     Mode.Col := 0;
     Video.GetVideoMode(Mode);
     Mode.Col := NewWidth;
     Mode.Row := NewHeight;
     Video.SetVideoMode(Mode);
+    MySize.cx := NewWidth;
+    MySize.cy := NewHeight;
     ClearScreen;
     Left.Resize(Rect(0, 0, (ScreenWidth div 2) - 1, ScreenHeight - 1));
     Right.Resize(Rect((ScreenWidth div 2), 0, ScreenWidth - 1, ScreenHeight - 1));
@@ -219,6 +189,7 @@ begin
   end;
 end;
 
+{$ifdef HASAMIGA}
 function GetStrToolType(DObj: PDiskObject; Entry: string; Default: string): string;
 var
   Res: PChar;
@@ -232,11 +203,14 @@ begin
   if Assigned(Res) then
     Result := Res;
 end;
+{$endif}
 
 
 procedure GetSettings;
+{$ifdef HASAMIGA}
 var
   DObj: PDiskObject;
+{$endif}
 begin
   {$ifdef HASAMIGA}
   DObj := GetDiskObject(PChar(ParamStr(0)));
@@ -248,7 +222,7 @@ begin
     // Editor
     EditLink := GetStrToolType(DObj, 'EDITOR', EditLink);
     AltEditLink := GetStrToolType(DObj, 'EDITOR2', AltEditLink);
-    // Defaults
+    // Defaults                                          but with th
     LeftDefaultPath := GetStrToolType(DObj, 'LEFT', LeftDefaultPath);
     RightDefaultPath := GetStrToolType(DObj, 'RIGHT', RightDefaultPath);
     FreeDiskObject(DObj);
@@ -273,10 +247,14 @@ begin
   OnMouseEvent := @MouseEvent;
   OnResize := @ResizeEvent;
   OnIdle := @IdleEvent;
+  {$ifdef HASAMIGA}
   OnDropItem := @DropEvent;
+  {$endif}
 
   Left := TFileList.Create(Rect(0, 0, (ScreenWidth div 2) - 1, ScreenHeight - 1));
   Right := TFileList.Create(Rect((ScreenWidth div 2), 0, ScreenWidth - 1, ScreenHeight - 1));
+  Left.OtherSide := Right;
+  Right.OtherSide := Left;
 
   Src := Left;
   Dest := Right;
@@ -287,9 +265,8 @@ begin
   Right.ActiveElement := 0;
   Left.IsActive := True;
 
-  {$ifdef AMIGA68k}
-  if (PExecBase(AOS_ExecBase)^.AttnFlags and AFF_68080) <> 0 then
-    DeleteFile(ParamStr(0));
+  {$ifdef RELEASE}
+  CreateVersion;
   {$endif}
   {$ifdef HASAMIGA}
   MakeAppWindow;
@@ -303,21 +280,17 @@ begin
 end;
 
 const
-  VERSION = '$VER: MCAmiga 0.3 (11.05.2020)';
+  VERSION = '$VER: MCAmiga 0.4 (15.05.2020)';
 
 begin
-  {$ifdef AMIGA68k}
-  if (PExecBase(AOS_ExecBase)^.AttnFlags and AFF_68080) <> 0 then
-  begin
-    writeln('Anti-Coffin copy-protection, blocking Vampire');
-    halt(0);
-  end;
+  {$ifdef RELEASE}
+  DoVersionInformation;
   {$endif}
   InitVideo;
   InitMouse;
   InitKeyboard;
   {$ifdef HASAMIGA}
-  Video.SetWindowTitle('MyCommander Amiga 0.3', VERSION);
+  Video.SetWindowTitle('MyCommander Amiga 0.4', VERSION);
   {$endif}
 
   StartMe;

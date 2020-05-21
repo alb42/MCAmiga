@@ -168,8 +168,12 @@ implementation
 uses
   FileListUnit;
 
+const        //.........1.........2.........3.........4.........5........6.........7
+  F2MenuText1 = ' pack current folder as lha';
+
+
 const       //.........1.........2.........3.........4.........5........6.........7
-  HelpText = '     MyCommander Amiga Version 0.3 '+{$INCLUDE %FPCTARGETCPU%} + '-' + {$INCLUDE %FPCTARGETOS%} +'  '#13#10 +
+  HelpText = '     MyCommander Amiga Version 0.4 '+{$INCLUDE %FPCTARGETCPU%} + '-' + {$INCLUDE %FPCTARGETOS%} +'  '#13#10 +
              '   =================================================  '#13#10 +
              ' F1  - Help              Ins  - Select File'#13#10 +
              ' F3  - View              +    - Select by pattern'#13#10 +

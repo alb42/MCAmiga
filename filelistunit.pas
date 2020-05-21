@@ -6,11 +6,15 @@ interface
 
 uses
   {$ifdef HASAMIGA}
-  AmigaDOS, Exec,
+  AmigaDOS, Exec, Utility,
   {$endif}
   Video, Keyboard, Classes, SysUtils, Math, fgl, StrUtils, Mouse;
 
 const
+  AmigaExecMagic = $03F3;
+
+  ConDefault  : PChar ='CON:10/30/620/100/MCAmiga Console Output/CLOSE';
+
   UpperLeftEdge = #201;
   UpperRightEdge = #187;
   LowerRightEdge = #188;
@@ -61,11 +65,41 @@ type
 
 
   TMouseSelMode = (msNone, msSelect, msDeselect);
+  TArchiveType = (atLHA);
+
+  TArchiveEntry = class
+  public
+    Name: string;
+  end;
+
+  TArchiveFile = class(TArchiveEntry)
+    Size: LongWord;
+  end;
+
+  TArchiveDirList = specialize TFPGObjectList<TArchiveEntry>;
+
+  { TArchiveDir }
+
+  TArchiveDir = class(TArchiveEntry)
+  public
+    Entries: TArchiveDirList;
+    constructor Create; virtual;
+    destructor Destroy; override;
+    function EntryByName(AName: string): TArchiveEntry;
+  end;
+
 
   { TFileList }
 
   TFileList = class
   private
+    function GetInArchive: Boolean;
+  private
+    //FArchiveType: TArchiveType;
+    FArchiveDir: TArchiveDir;
+    FArchiveName: string;
+
+    FOtherSide: TFileList;
     FMouseSelMode: TMouseSelMode;
     FRect: TRect;
     FInnerRect: TRect;
@@ -85,10 +119,13 @@ type
     procedure DrawActive(NActive: Integer);
     procedure DrawEntry(Idx: Integer);
 
+    procedure ExtractSelectedFiles;
+
     procedure DoListOfSelectedFile(Recursive: Boolean; FL: TEntryList; out Dirs: integer; out Files: Integer; out Size: Int64);
 
     procedure SortList;
     procedure CheckSelected;
+    property InArchive: Boolean read GetInArchive;
   public
     constructor Create(ARect: TRect); virtual;
     destructor Destroy; override;
@@ -97,14 +134,15 @@ type
 
     procedure Update(UpdateList: Boolean);
     procedure GoToParent;
-    procedure EnterPressed;
+    procedure EnterPressed(WithShiftPressed: Boolean);
+    function CheckForArchiveEnter(AName: string): Boolean;
     function ResultOfEntry(out NewPath: string): Boolean;
 
-    procedure CopyFiles(Target: string); // F5
-    procedure MoveFiles(Target: string); // F6
-    procedure MakeDir(); // F7
-    procedure DeleteSelected(); // F8
-    procedure Rename(); // Shift F6
+    procedure CopyFiles; // F5
+    procedure MoveFiles; // F6
+    procedure MakeDir; // F7
+    procedure DeleteSelected; // F8
+    procedure Rename; // Shift F6
 
     procedure ActivateFile(AName: string);
     procedure SelectActiveEntry;
@@ -126,6 +164,7 @@ type
     property ActiveElement: Integer read FActiveElement write SetActiveElement;
     property ActiveEntry: TListEntry read GetActiveEntry;
     property PanelRect: TRect read FRect;
+    property OtherSide: TFileList read FOtherSide write FOtherSide;
   end;
 
 
@@ -134,6 +173,8 @@ type
   procedure SetChar(x,y: Integer; c: Char); overload;
   procedure SetText(x,y: Integer; s: string);
   function LimitName(AName: string; MaxLength: Integer; PathMode: Boolean = False): string;
+
+  function GetTempFileEvent(const Dir: string; const Prefix: string):string;
 
 implementation
 
@@ -218,6 +259,35 @@ begin
     SetChar(x + i - 1, y, s[i]);
 end;
 
+{ TArchiveDir }
+
+constructor TArchiveDir.Create;
+begin
+  Entries := TArchiveDirList.Create(True);
+end;
+
+destructor TArchiveDir.Destroy;
+begin
+  Entries.Free;
+  inherited Destroy;
+end;
+
+function TArchiveDir.EntryByName(AName: string): TArchiveEntry;
+var
+  i: Integer;
+begin
+  Result := nil;
+  AName := Lowercase(AName);
+  for i := 0 to Entries.Count - 1 do
+  begin
+    if LowerCase(Entries[i].Name) = AName then
+    begin
+      Result := Entries[i];
+      Exit;
+    end;
+  end;
+end;
+
 { TEntryList }
 
 procedure TEntryList.AddFile(AName: string; Size: Int64);
@@ -272,6 +342,15 @@ procedure TFileList.SetCurrentPath(AValue: string);
 begin
   if FCurrentPath = AValue then
     Exit;
+  if InArchive then
+  begin
+    if Pos(#10, AValue) < 1 then
+    begin
+      FArchiveDir.Free;
+      FArchiveDir := nil;
+      FArchiveName := '';
+    end;
+  end;
   FCurrentPath := ExcludeTrailingPathDelimiter(AValue);
   Update(True);
 end;
@@ -282,6 +361,11 @@ begin
     Exit;
   ActShowStart := 0;
   DrawActive(AValue);
+end;
+
+function TFileList.GetInArchive: Boolean;
+begin
+  Result := Assigned(FArchiveDir);
 end;
 
 function TFileList.GetActiveEntry: TListEntry;
@@ -344,9 +428,13 @@ procedure TFileList.DrawContents(UpdateList: Boolean);
 var
   Info: TSearchRec;
   i: Integer;
+  s: string;
+  Parts: TStringList;
   NEntry: TListEntry;
   {$ifdef HASAMIGA}
   dl: PDosList;
+  CDir: TArchiveDir;
+  AE: TArchiveEntry;
   {$endif}
 begin
   FGPen := LightGray;
@@ -387,24 +475,58 @@ begin
       NEntry.EType := etParent;
       FFileList.Add(NEntry);
       {$endif}
-      if FindFirst(IncludeTrailingPathDelimiter(FCurrentPath) + '*', faAnyFile and faDirectory, Info) = 0 then
+      if InArchive then
       begin
-        repeat
+        s := Copy(FCurrentPath, Pos(#10, FCurrentPath), Length(FCurrentPath));
+        Parts := TStringList.Create;
+        ExtractStrings(['/'], [], PChar(s), Parts);
+        CDir := FArchiveDir;
+        for i := 0 to Parts.Count - 1 do
+        begin
+          AE := CDir.EntryByName(Parts[i]);
+          if AE is TArchiveDir then
+            CDir := TArchiveDir(AE);
+        end;
+        for i := 0 to CDir.Entries.Count - 1 do
+        begin
+          AE := CDir.Entries[i];
           NEntry := TListEntry.Create;
-          if (Info.Attr and faDirectory) <> 0 then
+          if AE is TArchiveDir then
           begin
-            NEntry.Name := IncludeTrailingPathDelimiter(Info.Name);
+            NEntry.Name := AE.Name + '/';
             NEntry.EType := etDir;
-          end
-          else
+          end;
+          if AE is TArchiveFile then
           begin
-            NEntry.Name := Info.Name;
+            NEntry.Name := AE.Name;
             NEntry.EType := etFile;
-            NEntry.Size := Info.Size;
+            NEntry.Size := TArchiveFile(AE).Size;
           end;
           FFileList.Add(NEntry);
-        until FindNext(info) <> 0;
-        FindClose(Info);
+        end;
+        Parts.Free;
+      end
+      else
+      begin
+        if FindFirst(IncludeTrailingPathDelimiter(FCurrentPath) + '*', faAnyFile and faDirectory, Info) = 0 then
+        begin
+          repeat
+            NEntry := TListEntry.Create;
+            if (Info.Attr and faDirectory) <> 0 then
+            begin
+              NEntry.Name := IncludeTrailingPathDelimiter(Info.Name);
+              NEntry.EType := etDir;
+            end
+            else
+            begin
+              NEntry.Name := Info.Name;
+              NEntry.EType := etFile;
+              NEntry.Size := Info.Size;
+            end;
+            FFileList.Add(NEntry);
+          until FindNext(info) <> 0;
+          FindClose(Info);
+        end;
       end;
     end;
     SortList;
@@ -556,6 +678,92 @@ begin
   BGPen := Blue;
 end;
 
+// Recursively Delete a complete Temp directory (contents and directory)
+procedure DeleteAll(TempName: string);
+var
+  FindInfo: TSearchRec;
+begin
+  if FindFirst(IncludeTrailingPathDelimiter(TempName) + '*', faAnyFile and faDirectory, FindInfo) = 0 then
+  begin
+    repeat
+      if (FindInfo.Attr and faDirectory) <> 0 then
+        DeleteAll(IncludeTrailingPathDelimiter(TempName + FindInfo.Name))
+      else
+        DeleteFile(TempName + FindInfo.Name);
+    until FindNext(FindInfo) <> 0;
+    FindClose(FindInfo);
+  end;
+  DeleteFile(Tempname);
+end;
+
+// Extract Files from Archive file
+procedure TFileList.ExtractSelectedFiles();
+const
+  BufferSize = 1024 * 1024;
+var
+  Buffer: Pointer;
+  FL: TEntryList;
+  Dirs, Files, i: integer;
+  Size: Int64;
+  SrcName: String;
+  TempName, BasePath, cmd: string;
+  SF,DF: TFileStream;
+  ReadBytes: LongInt;
+  Target: string;
+begin
+  if OtherSide.InArchive then
+  begin
+    ShowMessage('Copy from archive to archive not supported.');
+    Exit;
+  end;
+  Target := OtherSide.CurrentPath;
+  //
+  TempName := GetTempFileEvent('T:', 'mcdir');
+  CreateDir(TempName);
+  TempName := IncludeTrailingPathDelimiter(TempName);
+  Target := IncludeTrailingPathDelimiter(Target);
+  Buffer := AllocMem(BufferSize);
+
+  // get BasePath
+  BasePath := IncludeTrailingPathDelimiter(Copy(FCurrentPath, Pos(#10, FCurrentPath) + 2, Length(FCurrentPath)));
+  FL := TEntryList.Create(True);
+  try
+    DoListOfSelectedFile(True, FL, Dirs, Files, Size);
+    if FL.Count > 0 then
+    begin
+      if AskQuestion('Extract ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files (' + Trim(FormatSize(Size))  + 'byte)? ') then
+      begin
+        for i := 0 to FL.Count - 1 do
+        begin
+          SrcName := FL[i].Name;
+          if (FL[i].EType = etDir) and (not FileExists(ExcludeTrailingPathDelimiter(IncludeTrailingPathDelimiter(Target) + SrcName))) then
+            CreateDir(ExcludeTrailingPathDelimiter(IncludeTrailingPathDelimiter(Target) + SrcName));
+          if FL[i].EType = etFile then
+          begin
+            cmd := 'c:lha e ' + FArchiveName + ' ' + BasePath + FL[i].Name  + ' ' +TempName;
+            SystemTags(PChar(cmd), [TAG_END]);
+            if FileExists(TempName + BasePath + FL[i].Name) then
+            begin
+              SF := TFileStream.Create(TempName + BasePath + FL[i].Name, fmOpenRead);
+              DF := TFileStream.Create(Target + FL[i].Name, fmCreate);
+              repeat
+                ReadBytes := SF.Read(Buffer^, BufferSize);
+                DF.Write(Buffer^, ReadBytes);
+              until ReadBytes = 0;
+              SF.Free;
+              DF.Free;
+            end;
+          end;
+        end;
+      end;
+    end;
+  finally
+    DeleteAll(TempName);
+    FL.Free;
+    FreeMem(Buffer);
+  end;
+end;
+
 
 function ListCompare(const Item1, Item2: TListEntry): Integer;
 begin
@@ -604,6 +812,8 @@ end;
 constructor TFileList.Create(ARect: TRect);
 begin
   inherited Create;
+  FArchiveDir := nil;
+  //
   FMouseSelMode := msNone;
   FActiveElement := -1;
   FTopElement := -1;
@@ -662,26 +872,186 @@ begin
   end;
 end;
 
-procedure TFileList.EnterPressed;
+procedure TFileList.EnterPressed(WithShiftPressed: Boolean);
 var
-  s: string;
+  s, Params: string;
+  FS: TFileStream;
+  Magic: LongWord;
+  Ret: LongInt;
+  ToChange: TFileList;
 begin
+  if WithShiftPressed then
+    ToChange := OtherSide
+  else
+    ToChange := Self;
   if InRange(FActiveElement, 0, FFileList.Count - 1) then
   begin
     s := CurrentPath;
     case FFileList[FActiveElement].EType of
       etDir: begin
-        CurrentPath := IncludeTrailingPathDelimiter(s) + FFileList[FActiveElement].Name;
-        ActiveElement :=  0;
+        ToChange.CurrentPath := IncludeTrailingPathDelimiter(s) + FFileList[FActiveElement].Name;
+        ToChange.ActiveElement :=  0;
       end;
       etDrive,
       etAssign: begin
-        CurrentPath := FFileList[FActiveElement].Name;
-        ActiveElement :=  0;
+        ToChange.CurrentPath := FFileList[FActiveElement].Name;
+        ToChange.ActiveElement :=  0;
       end;
       etParent: GoToParent;
-      else
+      etFile: begin
+        if CheckForArchiveEnter(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name) then
+        begin
+          FArchiveName := IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name;
+          FCurrentPath := FArchiveName + #10;
+          Self.Update(True);
+          Exit;
+        end;
+        try
+          FS := TFileStream.Create(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name, fmOpenRead);
+          Magic := 0;
+          FS.Read(Magic, SizeOf(LongWord));
+          FS.Free;
+          FS := nil;
+          if Magic = AmigaExecMagic then
+          begin
+            Params := '';
+            try
+            if AskForName('Parameter:', Params, False) then
+            begin
+              NonWaitMessage('Starting ' + FFileList[FActiveElement].Name);
+              {$ifdef MorphOS}
+              if NativeUInt(DosOutPut) = 0 then
+                PProcess(FindTask(nil))^.pr_COS := BPTR(MOS_ConHandle);
+              {$else}
+                {$ifdef HASAMIGA}
+                if NativeUInt(DosOutPut) = 0 then
+                  PProcess(FindTask(nil))^.pr_COS := BPTR(AOS_ConHandle);
+                {$endif}
+              {$endif}
+              Ret := ExecuteProcess(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name, [Params]);
+              if Ret <> 0 then
+                ShowMessage(FFileList[FActiveElement].Name + ' returned with error message: ' + IntToStr(Ret));
+            end;
+            except
+              ;
+            end;
+            Self.Update(False);
+            OtherSide.Update(False);
+          end;
+        finally
+          FS.Free;
+        end;
+      end;
+    end;
+  end;
+end;
+
+function TFileList.CheckForArchiveEnter(AName: string): Boolean;
+var
+  Outfile: BPTR;
+  SL,Parts: TStringList;
+  TempName, AFName, s: string;
+  CurPos, i, LastAEntry: Integer;
+  IsDir: Boolean;
+  CDir: TArchiveDir;
+  AE: TArchiveEntry;
+begin
+  Result := False;
+  if InArchive then
+    Exit;
+  if not FileExists('c:lha') then
+    Exit;
+  if LowerCase(ExtractFileExt(AName)) = '.lha' then
+  begin
+    TempName := GetTempFileEvent('t:', '.mcamiga');
+    Outfile := DOSOpen(PChar(TempName), MODE_NEWFILE);
+    Systemtags(PChar('c:lha vv ' + AName), [SYS_Output, AsTag(Outfile), TAG_END]);
+    DosClose(OutFile);
+    SL := TStringList.Create;
+    SL.LoadFromFile(TempName);
+    DeleteFile(TempName);
+    //search for start
+    CurPos := -1;
+    for i := 0 to SL.Count - 1 do
+    begin
+      if Pos('Listing of archive', SL[i]) = 1 then
+        CurPos := i;
+    end;
+    if CurPos < 0 then
+    begin
+      writeln('listing not found');
+      writeln(SL.Text);
+      Exit;
+    end;
+    CurPos := CurPos + 1;
+    if Pos('Original', SL[CurPos]) <> 1 then
+    begin
+      writeln('original not found');
+      writeln(SL.Text);
+      Exit;
+    end;
+    CurPos := CurPos + 2; // jump over -----
+
+    Parts := TStringList.Create;
+    FArchiveDir := TArchiveDir.Create;
+    while CurPos < SL.Count do
+    begin
+      AFName := Trim(SL[CurPos]);
+      if (AFName = '') or (Pos('----', AFName) = 1) then
+        Break;
+      IsDir := AFName[Length(AFName)] = '/';
+      //writeln('check "', AFName + '"', IsDir);
+      CurPos := CurPos + 1;
+      Parts.Clear;
+      ExtractStrings(['/'], [], PChar(AFName), Parts);
+      // go to dirs
+      CDir := FArchiveDir;
+      LastAEntry := Parts.Count - 2;
+      if IsDir then
+        LastAEntry := Parts.Count - 1;
+      for i := 0 to LastAEntry do
+      begin
+        AE := CDir.EntryByName(Parts[i]);
+        if not Assigned(AE) then
+        begin
+          AE := TArchiveDir.Create;
+          AE.Name := Parts[i];
+          CDir.Entries.Add(AE);
+        end;
         //
+        if AE is TArchiveFile then
+        begin
+          //how this is possible?
+          writeln('how is that possible? ', AE.Name, ' is a file, but should be dir');
+          FArchiveDir.Free;
+          FArchiveDir := nil;
+          Parts.Free;
+          Exit;
+        end;
+        if AE is TArchiveDir then
+          CDir := TArchiveDir(AE);
+      end;
+      if not IsDir then
+      begin
+        AE := TArchiveFile.Create;
+        AE.Name := Parts[Parts.Count - 1];
+        if CurPos >= SL.Count then
+          Exit;
+        // get Size;
+        s := trim(SL[CurPos]);
+        s := Copy(s, 1, Pos(' ', s) - 1);
+        TArchiveFile(AE).Size := StrToIntDef(s, 0);
+        CDir.Entries.Add(AE);
+      end;
+      CurPos := CurPos + 1;
+    end;
+    Parts.Free;
+    Result := FArchiveDir.Entries.Count > 0;
+    if not Result then
+    begin
+      FArchiveDir.Free;
+      FArchiveDir := nil;
+      FArchiveName := '';
     end;
   end;
 end;
@@ -742,11 +1112,62 @@ begin
       ShowMessage('Unable to create dir "' + NewName + '"');
     Update(True);
     ActivateFile(IncludeTrailingPathDelimiter(NewName));
-  end;
+  end
+  else
+    Update(False);
+  OtherSide.Update(False);
 end;
 
 var
   CountPG: TSingleProgress = nil;
+
+procedure RecurseDirsArchive(BasePath, AName: string; FArchiveDir: TArchiveDir; FL: TEntryList; var Dirs: Integer; var Files: Integer; var Size: Int64);
+var
+  Parts: TStringList;
+  CDir: TArchiveDir;
+  i: Integer;
+  AE: TArchiveEntry;
+  ABasePath, FullPath: string;
+begin
+  ABasePath := ExcludeTrailingPathDelimiter(Copy(BasePath, Pos(#10, BasePath) + 1, Length(BasePath)));
+  if Assigned(CountPG) then
+    CountPG.UpdateValue(0, ABasePath + ' ' + IntToStr(Files + Dirs));
+  if ABasePath <> '' then
+  begin
+    Parts := TStringList.Create;
+    FullPath := IncludeTrailingPathDelimiter(ABasePath) + AName;
+    ExtractStrings(['/'], [], PChar(FullPath), Parts);
+    CDir := FArchiveDir;
+    for i := 0 to Parts.Count - 1 do
+    begin
+      AE := CDir.EntryByName(Parts[i]);
+      if not Assigned(AE) then
+        Exit;
+      if AE is TArchiveDir then
+      begin
+        CDir := TArchiveDir(AE);
+      end
+      else
+        Exit;
+    end;
+    for i := 0 to CDir.Entries.Count - 1 do
+    begin
+      AE := CDir.Entries[i];
+      if AE is TArchiveFile then
+      begin
+        FL.AddFile(IncludeTrailingPathDelimiter(AName) + AE.Name, TArchiveFile(AE).Size);
+        Size := Size + TArchiveFile(AE).Size;
+        Inc(Files);
+      end;
+      if AE is TArchiveDir then
+      begin
+        FL.AddDir(IncludeTrailingPathDelimiter(AName) + AE.Name);
+        Inc(Dirs);
+        RecurseDirsArchive(ABasePath, IncludeTrailingPathDelimiter(ExcludeLeadingPathDelimiter(AName)) + AE.Name, FArchiveDir, FL, Dirs, Files, Size);
+      end;
+    end;
+  end;
+end;
 
 procedure RecurseDirs(BasePath, AName: string; FL: TEntryList; var Dirs: Integer; var Files: Integer; var Size: Int64);
 var
@@ -806,7 +1227,12 @@ begin
         FL.AddDir(FFileList[i].Name);
         Inc(Dirs);
         if Recursive then
-          RecurseDirs(IncludeTrailingPathDelimiter(FCurrentPath), FFileList[i].Name, FL, Dirs, Files, Size);
+        begin
+          if InArchive then
+            RecurseDirsArchive(IncludeTrailingPathDelimiter(FCurrentPath), FFileList[i].Name, FArchiveDir, FL, Dirs, Files, Size)
+          else
+            RecurseDirs(IncludeTrailingPathDelimiter(FCurrentPath), FFileList[i].Name, FL, Dirs, Files, Size);
+        end;
       end;
       Found := True;
     end;
@@ -825,7 +1251,12 @@ begin
       FL.AddDir(FFileList[FActiveElement].Name);
       Inc(Dirs);
       if Recursive then
-        RecurseDirs(IncludeTrailingPathDelimiter(FCurrentPath), FFileList[FActiveElement].Name, FL, Dirs, Files, Size);
+      begin
+        if InArchive then
+          RecurseDirsArchive(IncludeTrailingPathDelimiter(FCurrentPath), FFileList[FActiveElement].Name, FArchiveDir, FL, Dirs, Files, Size)
+        else
+          RecurseDirs(IncludeTrailingPathDelimiter(FCurrentPath), FFileList[FActiveElement].Name, FL, Dirs, Files, Size);
+      end;
     end;
   end;
   CountPG.Free;
@@ -840,12 +1271,32 @@ var
   NotDeleted: Integer;
   PG: TSingleProgress;
   Size: Int64;
+  s: string;
 begin
   FL := TEntryList.Create;
   try
     dirs := 0;
     Files := 0;
     NotDeleted := 0;
+    if InArchive then
+    begin
+      DoListOfSelectedFile(True, FL, dirs, files, Size);
+      if AskQuestion('Delete from archive ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files (' + Trim(FormatSize(Size)) + 'byte)?') then
+      begin
+        s := ExcludeLeadingPathDelimiter(Trim(Copy(FCurrentPath, Pos(#10, FCurrentPath), Length(FCurrentPath))));
+        if s <> '' then
+          s := IncludeTrailingPathDelimiter(s);
+        for i := FL.Count - 1 downto 0 do
+        begin
+          SystemTags(PChar('c:lha d -K ' + FArchiveName + ' ' + s + ExcludeTrailingPathDelimiter(FL[i].Name)), [TAG_END]);
+        end;
+        FArchiveDir.Free;
+        FArchiveDir := nil;
+        CheckForArchiveEnter(FArchiveName);
+        Update(True);
+      end;
+      Exit;
+    end;
     // make a list of all
     DoListOfSelectedFile(True, FL, dirs, files, Size);
     if FL.Count > 0 then
@@ -881,6 +1332,8 @@ begin
     end;
   finally
     FL.Free;
+    Update(False);
+    OtherSide.Update(False);
   end;
 end;
 
@@ -897,7 +1350,10 @@ begin
       begin
         SysUtils.RenameFile(IncludeTrailingPathDelimiter(FCurrentPath) + ExcludeTrailingPathDelimiter(FFileList[FActiveElement].Name), IncludeTrailingPathDelimiter(FCurrentPath) + NewName);
         Update(True);
-      end;
+      end
+      else
+        Update(False);
+      OtherSide.Update(False);
     end;
   end;
 end;
@@ -955,11 +1411,9 @@ begin
     s := FFileList[FActiveElement].Name;
     if Length(s) > FInnerRect.Width then
     begin
-      writeln('is too long ', ActShowStart);
       Inc(ActShowStart);
       if ActShowStart > (Length(s) - FInnerRect.Width) then
         ActShowStart := 0;
-      writeln('  new actshow start', ActShowStart);
       DrawActive(FActiveElement);
     end;
   end;
@@ -1073,6 +1527,8 @@ begin
         if Ret <> 0 then
           ShowMessage(OpenWithProgram + ' returned with error message: ' + IntToStr(Ret));
       end;
+      Update(False);
+      OtherSide.Update(False);
     end;
   end;
 end;
@@ -1097,6 +1553,8 @@ begin
         if Ret <> 0 then
           ShowMessage(OpenWithProgram + ' returned with error message: ' + IntToStr(Ret));
       end;
+      Update(True);
+      OtherSide.Update(False);
     end;
   end;
 end;
@@ -1123,6 +1581,8 @@ begin
     end;
     CheckSelected;
   end;
+  Update(False);
+  OtherSide.Update(False);
 end;
 
 procedure TFileList.MouseEvent(Me: TMouseEvent);
@@ -1138,7 +1598,7 @@ begin
           if not InRange(l, 0, FFileList.Count - 1) then
             Exit;
           if ActiveElement = l then
-            EnterPressed
+            EnterPressed(False)
           else
             ActiveElement := l;
           Exit;
@@ -1207,7 +1667,7 @@ begin
 end;
 
 //############ Copy
-procedure TFileList.CopyFiles(Target: string);
+procedure TFileList.CopyFiles();
 const
   BufferSize = 100 * 1024;
 var
@@ -1227,7 +1687,19 @@ var
   PG2: TDoubleProgress;
   Size: Int64;
   Res: TDialogResult;
+  Target: string;
 begin
+  if InArchive then
+  begin
+    try
+      ExtractSelectedFiles;
+    except
+    end;
+    Update(False);
+    OtherSide.Update(True);
+    Exit;
+  end;
+  Target := OtherSide.CurrentPath;
   Res := mrNone;
   FL := TEntryList.Create;
   try
@@ -1239,8 +1711,8 @@ begin
     dirs := 0;
     Files := 0;
     NotCopied := 0;
-    // make a list of all
     DoListOfSelectedFile(True, FL, dirs, files, Size);
+    // make a list of all
     if FL.Count > 0 then
     begin
       if AskQuestion('Copy ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files (' + Trim(FormatSize(Size))  + 'byte)? ') then
@@ -1437,10 +1909,12 @@ begin
   finally
     FL.Free;
   end;
+  Update(False);
+  OtherSide.Update(True);
 end;
 
 //############ Copy
-procedure TFileList.MoveFiles(Target: string);
+procedure TFileList.MoveFiles();
 const
   BufferSize = 100 * 1024;
 var
@@ -1461,7 +1935,9 @@ var
   Size: Int64;
   IsSameDevice: Boolean;
   Res: TDialogResult;
+  Target: string;
 begin
+  Target := OtherSide.CurrentPath;
   Res := mrNone;
   FL := TEntryList.Create;
   try
@@ -1514,6 +1990,7 @@ begin
           end;
         end;
         Update(True);
+        OtherSide.Update(True);
       end;
       Exit;
     end;
@@ -1710,11 +2187,24 @@ begin
             DeleteFile(IncludeTrailingPathDelimiter(FCurrentPath) + ExcludeTrailingPathDelimiter(FL[i].Name));
         end;
         Update(True);
+        OtherSide.Update(True);
       end;
     end;
   finally
     FL.Free;
+    Update(False);
+    OtherSide.Update(False);
   end;
+end;
+
+function GetTempFileEvent(const Dir: string; const Prefix: string):string;
+var
+  i: Integer;
+begin
+  i := 0;
+  while FileExists(IncludeTrailingPathDelimiter(Dir) + HexStr(i, 8) + Prefix) do
+    Inc(i);
+  Result := IncludeTrailingPathDelimiter(Dir) + HexStr(i, 8) + Prefix;
 end;
 
 
