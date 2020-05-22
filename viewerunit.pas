@@ -381,6 +381,11 @@ begin
       Mode := vmText;
       if Assigned(Buffer) then
         FreeMem(Buffer);
+      if OrigText.Count = 0 then
+      begin
+        OrigText.LoadFromFile(Filename);
+        FormatText;
+      end;
       Buffer := nil;
       Paint;
     end;
@@ -570,17 +575,49 @@ begin
   inherited Destroy;
 end;
 
+function IsASCIIByte(a: Byte): Boolean; inline;
+begin
+  Result := a in [9, 10, 13, 26, 32..127];
+end;
+
 procedure TFileViewer.Execute(AFilename: string);
 var
   Key: TKeyEvent;
   st: Byte;
+  FS: TFileStream;
+  Magic: array[0..255] of Byte;
+  MaxMagic, i: Integer;
+  IsASCII: Boolean;
 begin
   FileName := AFilename;
   OrigText.Clear;
-  OrigText.LoadFromFile(AFileName);
-  FStartLine := 0;
-  FormatText;
-  Paint;
+  Magic[0] := 0;
+  FS := TFileStream.Create(FileName, fmOpenRead);
+  MaxMagic := FS.Read(Magic[0], Length(Magic));
+  FS.Free;
+  IsASCII := True;
+  if FS.Size > 1024*1024 then
+  begin
+    IsASCII := False
+  end
+  else
+    for i := 0 to MaxMagic - 1 do
+    begin
+      if not IsASCIIByte(Magic[i]) then
+      begin
+        IsASCII := False;
+        Break;
+      end;
+    end;
+  if IsASCII then
+  begin
+    OrigText.LoadFromFile(FileName);
+    FStartLine := 0;
+    FormatText;
+    Paint;
+  end
+  else
+    SwitchMode;
   //
   repeat
     Key := PollNextKey;
