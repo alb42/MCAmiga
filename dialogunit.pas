@@ -5,6 +5,7 @@ unit dialogunit;
 interface
 
 uses
+  Exec, Utility, AmigaDos, FileListUnit,
   Types, Classes, SysUtils, Video, Keyboard, Mouse, Math, EventUnit;
 
 const
@@ -137,6 +138,34 @@ type
     function UpdateValue2(AValue1: LongWord; NText1: string = ''; AValue2: LongWord = 0; NText2: string = ''): Boolean;
   end;
 
+  { TToolsMenu }
+
+  TToolsEvent = procedure of object;
+
+  TToolsMenu = class(TBaseDialog)
+  private
+    Finished: Boolean;
+    CurrentEntry: LongInt;
+    Tools: array of record
+      AName: string;
+      Event: TToolsEvent;
+    end;
+    MaxLen: Integer;
+    procedure AddToolsEntry(Name: string; Event: TToolsEvent);
+    // events
+    procedure LhaPackEvent;
+    procedure LzxPackEvent;
+    procedure ShellEvent;
+  protected
+    procedure ProcessMouse(MouseEvent: TMouseEvent); override;
+    procedure DrawButtons; override;
+    procedure Paint; override;
+  public
+    DestP, SrcP: TFileList;
+    constructor Create; virtual;
+    function Execute: TDialogResult; override;
+  end;
+
 
 
 
@@ -151,11 +180,10 @@ procedure ShowViewHelp;
 procedure ShowMessage(AText: string);
 procedure NonWaitMessage(AText: string);
 
+procedure ShowTools(SrcPanel, DestPanel: TFileList);
+
 
 implementation
-
-uses
-  FileListUnit;
 
 const
   URCorner = #191;
@@ -169,12 +197,9 @@ const
   LBorder = #180;
 
   ProgressEmpty = #176;
-  ProgressHalf = #221;
+  //ProgressHalf = #221;
   ProgressFull = #219;
 
-
-const        //.........1.........2.........3.........4.........5........6.........7
-  F2MenuText1 = ' pack current folder as lha';
 
 
 const       //.........1.........2.........3.........4.........5........6.........7
@@ -243,6 +268,17 @@ begin
   end;
 end;
 
+procedure ShowTools(SrcPanel, DestPanel: TFileList);
+begin
+  With TToolsMenu.Create do
+  begin
+    SrcP := SrcPanel;
+    DestP := DestPanel;
+    Execute;
+    Free;
+  end;
+end;
+
 function AskQuestion(AText: string): Boolean;
 begin
   with TAskQuestion.Create do
@@ -303,6 +339,159 @@ begin
       HexString := NewName;
     Free;
   end;
+end;
+
+{ TToolsMenu }
+
+procedure TToolsMenu.AddToolsEntry(Name: string; Event: TToolsEvent);
+var
+  Idx: Integer;
+begin
+  Idx := Length(Tools);
+  SetLength(Tools, Idx + 1);
+  Tools[Idx].AName := Name;
+  Tools[Idx].Event := Event;
+end;
+
+procedure TToolsMenu.LhaPackEvent;
+begin
+  SrcP.PackArchive(atLHA);
+end;
+
+procedure TToolsMenu.LzxPackEvent;
+begin
+  SrcP.PackArchive(atLZX);
+end;
+
+procedure TToolsMenu.ShellEvent;
+var
+  s: string;
+begin
+  s := SrcP.CurrentPath;
+  if Pos(#10, s) > 0 then
+  begin
+    s := Copy(s, 1, Pos(#10, s) - 1);
+    s := ExtractFilePath(s);
+  end;
+  SetCurrentDir(s);
+  SystemTags('c:run newcli', [NP_CLI, AsTag(True), TAG_END]);
+end;
+
+procedure TToolsMenu.ProcessMouse(MouseEvent: TMouseEvent);
+var
+  NEntry: Integer;
+begin
+  if (MouseEvent.Action = MouseActionDown) and (MouseEvent.buttons = MouseLeftButton) then
+  begin
+    NEntry := EnsureRange((MouseEvent.Y - InnerRect.Top) div 2, 0, High(Tools));
+    if NEntry = CurrentEntry then
+    begin
+      Tools[CurrentEntry].Event();
+      Finished := True;
+    end
+    else
+      CurrentEntry := NEntry;
+    Paint;
+  end;
+end;
+
+procedure TToolsMenu.DrawButtons;
+begin
+
+end;
+
+procedure TToolsMenu.Paint;
+var
+  i: Integer;
+  s: string;
+begin
+  BGPen := Cyan;
+  FGPen := White;
+
+  inherited;
+
+  WindowRect.Left := Max(2, mid.x - Max(20, MaxLen + 1));
+  WindowRect.Top := Max(2, mid.y - Length(Tools) div 2 - 2);
+  WindowRect.Bottom := Min(ScreenHeight - 3, mid.y +  Length(Tools) div 2 + 2);
+  WindowRect.Right :=  Min(ScreenWidth - 3, mid.x + Max(20, MaxLen + 1));
+
+  DrawWindowBorder;
+
+  for i := 0 to High(Tools) do
+  begin
+    if i = CurrentEntry then
+      BGPen := Black
+    else
+      BGPen := Cyan;
+
+    s := IntToStr(i + 1) + '    ' + Tools[i].AName;
+    s := s + Space(InnerRect.Width - 6 - Length(S));
+    SetText(InnerRect.Left + 2, InnerRect.Top + i * 2, s);
+  end;
+  UpdateScreen(False);
+end;
+
+constructor TToolsMenu.Create;
+begin
+  AddToolsEntry('Open new shell window', @ShellEvent);
+  AddToolsEntry('Pack selected with lha', @LhaPackEvent);
+  AddToolsEntry('Pack selected with lzx', @lzxPackEvent);
+end;
+
+function TToolsMenu.Execute: TDialogResult;
+var
+  i: Integer;
+  Key: TKeyEvent;
+  c: Char;
+begin
+  Finished := False;
+  CurrentEntry := 0;
+  MaxLen := 10;
+  for i := 0 to High(Tools) do
+    MaxLen := Max(Length(Tools[i].AName), MaxLen);
+  MaxLen := MaxLen + 5;
+  Paint;
+  repeat
+    Key := PollNextKey;
+    if Finished then
+      Break;
+    c := GetKeyEventChar(Key);
+    if c in ['1'..'9'] then
+    begin
+      i := StrToInt(c) - 1;
+      if i <= High(Tools) then
+      begin
+        Tools[i].Event();
+        Break;
+      end;
+    end;
+    case TranslateKeyEvent(Key) and $ffff of
+      kbdUp: begin
+        if CurrentEntry = 0 then
+          CurrentEntry := High(Tools)
+        else
+          Dec(CurrentEntry);
+        Paint;
+      end;
+      kbdDown: begin
+        if CurrentEntry = High(Tools) then
+          CurrentEntry := 0
+        else
+          Inc(CurrentEntry);
+        Paint;
+      end;
+       $1C0D, $000D: begin
+        Tools[CurrentEntry].Event();
+        Break;
+      end;
+      $011B: begin
+        Result := mrCancel;
+        Exit;
+      end;
+    end;
+    Sleep(25);
+  until False;
+  Result := mrOK;
 end;
 
 { TAskMultipleQuestion }

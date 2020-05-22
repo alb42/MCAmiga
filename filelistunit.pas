@@ -10,8 +10,15 @@ uses
   {$endif}
   Video, Keyboard, Classes, SysUtils, Math, fgl, StrUtils, Mouse;
 
+
+type
+  TArchiveType = (atLHA, atLZX);
 const
   AmigaExecMagic = $03F3;
+
+  ArchiveCmd: array[TArchiveType] of string = ('c:lha', 'c:lzx');
+  ArchiveName: array[TArchiveType] of string = ('LHA', 'LZX');
+  ArchiveExt: array[TArchiveType] of string = ('.lha', '.lzx');
 
   ConDefault  : PChar ='CON:10/30/620/100/MCAmiga Console Output/CLOSE';
 
@@ -65,7 +72,6 @@ type
 
 
   TMouseSelMode = (msNone, msSelect, msDeselect);
-  TArchiveType = (atLHA);
 
   TArchiveEntry = class
   public
@@ -139,6 +145,8 @@ type
     function CheckForArchiveEnter(AName: string): Boolean;
     function ResultOfEntry(out NewPath: string): Boolean;
 
+    procedure PackArchive(Format: TArchiveType);
+
     procedure CopyFiles;      // F5
     procedure MoveFiles;      // F6
     procedure MakeDir;        // F7
@@ -181,6 +189,8 @@ implementation
 
 uses
   DialogUnit, EventUnit, ViewerUnit;
+
+procedure RecurseDirs(BasePath, AName: string; FL: TEntryList; var Dirs: Integer; var Files: Integer; var Size: Int64); forward;
 
 function LimitName(AName: string; MaxLength: Integer; PathMode: Boolean = False): string;
 var
@@ -698,7 +708,7 @@ begin
 end;
 
 // Extract Files from Archive file
-procedure TFileList.ExtractSelectedFiles();
+procedure TFileList.ExtractSelectedFiles;
 const
   BufferSize = 1024 * 1024;
 var
@@ -741,7 +751,7 @@ begin
             CreateDir(ExcludeTrailingPathDelimiter(IncludeTrailingPathDelimiter(Target) + SrcName));
           if FL[i].EType = etFile then
           begin
-            cmd := 'c:lha e "' + FArchiveName + '" "' + BasePath + FL[i].Name  + '" ' +TempName;
+            cmd := 'c:lha x "' + FArchiveName + '" "' + BasePath + FL[i].Name  + '" ' +TempName;
             SystemTags(PChar(cmd), [TAG_END]);
             if FileExists(TempName + BasePath + FL[i].Name) then
             begin
@@ -1190,8 +1200,72 @@ begin
   end;
 end;
 
+procedure TFileList.PackArchive(Format: TArchiveType);
+var
+  cmd, TempName, NewName, FilenameToPack: string;
+  SL: TStringList;
+  FL: TEntryList;
+  Dirs, Files, i: integer;
+  Size: Int64;
+  PG: TSingleProgress;
+  PackCmd: string;
+begin
+  //
+  if InArchive then
+  begin
+    ShowMessage('Packing from another archive not implemented');
+    Exit;
+  end;
+  if OtherSide.InArchive then
+  begin
+    ShowMessage('Packing into archive not implemented');
+    Exit;
+  end;
+  TempName := GetTempFileEvent('T:', '.pack');
+  FL := TEntryList.Create(True);
+  try
+    DoListOfSelectedFile(False, FL, Dirs, Files, Size);
+    NewName := '';
+    if (FL.Count > 0) and AskForName('Name for '+ ArchiveName[Format] +' archive name', NewName, True) then
+    begin
+      NewName := ChangeFileExt(NewName, ArchiveExt[Format]);
+      PackCmd := ArchiveCmd[Format];
+      PG := TSingleProgress.Create;
+      PG.Text := 'Pack files to '+ ArchiveName[Format] +'...';
+      PG.MaxValue := FL.Count;
+      PG.Execute;
+      for i := 0 to FL.Count - 1 do
+      begin
+        PG.UpdateValue(i + 1, 'Pack ' + FFileList[i].Name + ' to '+ ArchiveName[Format] +'...');
+        FileNameToPack := '';
+        if FL[i].EType = etDir then
+          FilenameToPack := '"' + IncludeTrailingPathDelimiter(FL[i].Name) + '#?"';
+        if FL[i].EType = etFile then
+          FilenameToPack := '"' + FL[i].Name + '"';
+        if FilenameToPack = '' then
+          Continue;
+        cmd := PackCmd + ' -r -x1 a "' + IncludeTrailingPathDelimiter(OtherSide.CurrentPath) + NewName + '" ' + FilenameToPack;
+        SL := TStringList.Create;
+        SL.Add('cd ' + FCurrentPath);
+        SL.Add(cmd);
+        Sl.SaveToFile(TempName);
+        SL.Free;
+        //
+        cmd := 'c:execute ' + TempName;
+        SystemTags(PChar(cmd), [TAG_END]);
+        DeleteFile(TempName);
+      end;
+    end;
+
+  finally
+    FL.Free;
+    Update(False);
+    OtherSide.Update(True);
+  end;
+end;
+
 //############ Make Dir
-procedure TFileList.MakeDir();
+procedure TFileList.MakeDir;
 var
   NewName: string;
 begin
@@ -1358,7 +1432,7 @@ begin
 end;
 
 //############ Delete
-procedure TFileList.DeleteSelected();
+procedure TFileList.DeleteSelected;
 var
   FL: TEntryList;
   i, Dirs, Files: Integer;
@@ -1431,7 +1505,7 @@ begin
   end;
 end;
 
-procedure TFileList.Rename();
+procedure TFileList.Rename;
 var
   NewName, OldName, BasePath, cmd: string;
 begin
@@ -1448,7 +1522,7 @@ begin
           if InArchive then
           begin
             BasePath := IncludeTrailingPathDelimiter(Copy(FCurrentPath, Pos(#10, FCurrentPath) + 2, Length(FCurrentPath)));
-            cmd := 'c:lha e "' + FArchiveName + '" "' + BasePath + FFileList[FActiveElement].Name  + '" T:';
+            cmd := 'c:lha x "' + FArchiveName + '" "' + BasePath + FFileList[FActiveElement].Name  + '" T:';
             SystemTags(PChar(cmd), [TAG_END]);
             cmd := 'c:lha d "' + FArchiveName + '" "' + BasePath + FFileList[FActiveElement].Name  + '"';
             SystemTags(PChar(cmd), [TAG_END]);
@@ -1638,7 +1712,7 @@ begin
       begin
         BasePath := IncludeTrailingPathDelimiter(Copy(FCurrentPath, Pos(#10, FCurrentPath) + 2, Length(FCurrentPath)));
         TempName := 'T:' + BasePath + FFileList[FActiveElement].Name;
-        cmd := 'c:lha e "' + FArchiveName + '" "' + BasePath + FFileList[FActiveElement].Name  + '" T:';
+        cmd := 'c:lha x "' + FArchiveName + '" "' + BasePath + FFileList[FActiveElement].Name  + '" T:';
         SystemTags(PChar(cmd), [TAG_END]);
         FileN := TempName;
       end
@@ -1675,7 +1749,7 @@ begin
       begin
         BasePath := IncludeTrailingPathDelimiter(Copy(FCurrentPath, Pos(#10, FCurrentPath) + 2, Length(FCurrentPath)));
         TempName := 'T:' + BasePath + FFileList[FActiveElement].Name;
-        cmd := 'c:lha e "' + FArchiveName + '" "' + BasePath + FFileList[FActiveElement].Name  + '" T:';
+        cmd := 'c:lha x "' + FArchiveName + '" "' + BasePath + FFileList[FActiveElement].Name  + '" T:';
         SystemTags(PChar(cmd), [TAG_END]);
         FileN := TempName;
       end
@@ -1816,7 +1890,7 @@ begin
 end;
 
 //############ Copy
-procedure TFileList.CopyFiles();
+procedure TFileList.CopyFiles;
 const
   BufferSize = 100 * 1024;
 var
@@ -2073,7 +2147,7 @@ begin
 end;
 
 //############ Copy
-procedure TFileList.MoveFiles();
+procedure TFileList.MoveFiles;
 const
   BufferSize = 100 * 1024;
 var

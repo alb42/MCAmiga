@@ -1,11 +1,13 @@
 MyCommander for Amiga,AmigaOS4,AROS,MorphOS
 -------------------------------------------
+License: CC0, source at https://www.github.com/alb42/MCAmiga
 
 Midnight/Norton commander style file manager for all Amiga systems.
 
 if the font is too big try to set the Environment variable FPC_VIDEO_BUILTINFONT to vga8
 e.g. echo vga8 >env:FPC_VIDEO_BUILTINFONT
 and restart the program, or create it in Envarc: to make it available as default.
+
 
 Keys:
 #####
@@ -50,6 +52,7 @@ General:
 --------
 
 F1       - Help
+F2       - Tools menu
 F10, ESC - Quit
 Ctrl + R - Rescan current directory
 Shift + Space - Scan Directory size
@@ -71,7 +74,7 @@ History:
 
 0.5
 - video fixes
-- browse through lha archives
+- browse, copy, move, rename, view/edit in lha archives
 
 0.4
 - mouse control

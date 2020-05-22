@@ -125,6 +125,12 @@ begin
       if ((st and kbAlt) <> 0) or ((st and kbCtrl) <> 0) then
       begin
         Right.CurrentPath := '';
+      end
+      else
+      begin
+        ShowTools(Src, Dest);
+        Left.Update(False);
+        Right.Update(False);
       end;
     end;
     kbdF1: begin                                      // F1 -> Help
