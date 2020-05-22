@@ -917,16 +917,22 @@ var
   n,i: LongInt;
   s: Single;
   st: String;
+  All: LongInt;
 begin
   n := 0;
   s := 0;
+  All := 0;
   for i := 0 to FFileList.Count - 1 do
   begin
-    if FFileList[i].Selected then
+    if FFileList[i].EType in [etFile, etDir, etAssign, etDrive] then
     begin
-      Inc(n);
-      if FFileList[i].Size > 0 then
-        s := s + FFileList[i].Size;
+      Inc(All);
+      if FFileList[i].Selected then
+      begin
+        Inc(n);
+        if FFileList[i].Size > 0 then
+          s := s + FFileList[i].Size;
+      end;
     end;
   end;
   BGPen := Blue;
@@ -935,7 +941,7 @@ begin
   begin
     SetChar(i, FRect.Bottom - 2, SingleLine);
   end;
-  SetText(FRect.Left + 1, FRect.Bottom - 2, ' ' + IntToStr(n) + '/' + IntToStr(FFileList.Count) + ' ');
+  SetText(FRect.Left + 1, FRect.Bottom - 2, ' ' + IntToStr(n) + '/' + IntToStr(All) + ' ');
   if s > 0 then
   begin
     st := Trim(FormatSize(s) + 'byte');
@@ -1621,7 +1627,8 @@ procedure TFileList.SelectActiveEntry;
 begin
   if InRange(FActiveElement, 0, FFileList.Count - 1) then
   begin
-    FFileList[FActiveElement].Selected := not FFileList[FActiveElement].Selected;
+    if FFileList[FActiveElement].EType in [etDir, etFile] then
+      FFileList[FActiveElement].Selected := not FFileList[FActiveElement].Selected;
     DrawEntry(FActiveElement);
     ActiveElement := FActiveElement + 1;
     CheckSelected;
@@ -1887,11 +1894,14 @@ begin
         begin
           if not InRange(l, 0, FFileList.Count - 1) then
             Exit;
-          FFileList[l].Selected := not FFileList[l].Selected;
-          if FFileList[l].Selected then
-            FMouseSelMode := msSelect
-          else
-            FMouseSelMode := msDeselect;
+          if FFileList[l].EType in [etDir, etFile] then
+          begin
+            FFileList[l].Selected := not FFileList[l].Selected;
+            if FFileList[l].Selected then
+              FMouseSelMode := msSelect
+            else
+              FMouseSelMode := msDeselect;
+          end;
           Update(False);
           Exit;
         end;
@@ -1902,7 +1912,10 @@ begin
         if not InRange(l, 0, FFileList.Count - 1) then
           Exit;
         if FMouseSelMode = msSelect then
-          FFileList[l].Selected := True
+        begin
+          if FFileList[l].EType in [etDir, etFile] then
+            FFileList[l].Selected := True
+        end
         else
           if FMouseSelMode = msDeselect then
             FFileList[l].Selected := False;
