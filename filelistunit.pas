@@ -125,8 +125,8 @@ type
     procedure DrawActive(NActive: Integer);
     procedure DrawEntry(Idx: Integer);
 
-    procedure ExtractSelectedFiles;
-    procedure PackSelectedFiles;
+    procedure ExtractSelectedFiles(AsMove: Boolean);
+    procedure PackSelectedFiles(AsMove: Boolean);
 
     procedure DoListOfSelectedFile(Recursive: Boolean; FL: TEntryList; out Dirs: integer; out Files: Integer; out Size: Int64);
 
@@ -416,7 +416,7 @@ begin
       SetChar(FRect.Right, i, VertLine);
     end;
   end;
-  s := LimitName(FCurrentPath, FRect.Width - 5, True);
+  s := LimitName(StringReplace(FCurrentPath, #10, ':', [rfReplaceAll]) , FRect.Width - 5, True);
   if IsActive then
   begin
     SetText(FRect.Left + 2, FRect.Top, LeftEdge);
@@ -708,7 +708,7 @@ begin
 end;
 
 // Extract Files from Archive file
-procedure TFileList.ExtractSelectedFiles;
+procedure TFileList.ExtractSelectedFiles(AsMove: Boolean);
 const
   BufferSize = 1024 * 1024;
 var
@@ -721,10 +721,11 @@ var
   SF,DF: TFileStream;
   ReadBytes: LongInt;
   Target: string;
+  PG: TSingleProgress;
 begin
   if OtherSide.InArchive then
   begin
-    ShowMessage('Copy from archive to archive not supported.');
+    ShowMessage('Copy/Move from archive to archive not supported.');
     Exit;
   end;
   Target := OtherSide.CurrentPath;
@@ -738,15 +739,21 @@ begin
   // get BasePath
   BasePath := IncludeTrailingPathDelimiter(Copy(FCurrentPath, Pos(#10, FCurrentPath) + 2, Length(FCurrentPath)));
   FL := TEntryList.Create(True);
+  PG := nil;
   try
     DoListOfSelectedFile(True, FL, Dirs, Files, Size);
     if FL.Count > 0 then
     begin
       if AskQuestion('Extract ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files (' + Trim(FormatSize(Size))  + 'byte)? ') then
       begin
+        PG := TSingleProgress.Create;
+        PG.Text := 'Extract files from LHA';
+        PG.MaxValue := FL.Count;
+        PG.Execute;
         for i := 0 to FL.Count - 1 do
         begin
           SrcName := FL[i].Name;
+          PG.UpdateValue(i + 1, 'Extract ' + ExtractFileName(FL[i].Name) + '...');
           if (FL[i].EType = etDir) and (not FileExists(ExcludeTrailingPathDelimiter(IncludeTrailingPathDelimiter(Target) + SrcName))) then
             CreateDir(ExcludeTrailingPathDelimiter(IncludeTrailingPathDelimiter(Target) + SrcName));
           if FL[i].EType = etFile then
@@ -764,11 +771,17 @@ begin
               SF.Free;
               DF.Free;
             end;
+            if AsMove then
+            begin
+              cmd := 'c:lha d "' + FArchiveName + '" "' + BasePath + FL[i].Name  + '"';
+              SystemTags(PChar(cmd), [TAG_END]);
+            end;
           end;
         end;
       end;
     end;
   finally
+    PG.Free;
     DeleteAll(TempName);
     FL.Free;
     FreeMem(Buffer);
@@ -796,7 +809,7 @@ begin
   SL.Free;
 end;
 
-procedure TFileList.PackSelectedFiles;
+procedure TFileList.PackSelectedFiles(AsMove: Boolean);
 const
   BufferSize = 1024 * 1024;
 var
@@ -806,8 +819,10 @@ var
   Dirs, Files, i, ReadBytes: integer;
   Size: Int64;
   SF, DF: TFileStream;
+  PG: TSingleProgress;
 begin
   Buffer := nil;
+  PG := nil;
   //
   Source := IncludeTrailingPathDelimiter(CurrentPath);
   //
@@ -823,12 +838,19 @@ begin
     begin
       if AskQuestion('Pack ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files (' + Trim(FormatSize(Size))  + 'byte)'#13#10 +'to ' + OtherSide.FArchiveName + '? ') then
       begin
+        PG := TSingleProgress.Create;
+        PG.Text := 'Pack files to LHA';
+        PG.MaxValue := FL.Count;
+        PG.Execute;
         CreateAllDir(TempName + ExcludeTrailingPathDelimiter(BasePath));
         for i := 0 to FL.Count - 1 do
         begin
           SrcName := FL[i].Name;
+          PG.UpdateValue(i + 1, 'Pack ' + ExtractFileName(SrcName) + '...');
           if FL[i].EType = etDir then
-            CreateDir(TempName + BasePath + SrcName);
+          begin
+            CreateDir(TempName + BasePath + ExcludeTrailingPathDelimiter(SrcName));
+          end;
           if FL[i].EType = etFile then
           begin
             if FileExists(Source + FL[i].Name) then
@@ -850,13 +872,27 @@ begin
             SystemTags(PChar(cmd), [TAG_END]);
           end;
         end;
+        PG.Free;
+        PG := TSingleProgress.Create;
+        PG.Text := 'Pack files to LHA';
+        PG.MaxValue := FL.Count;
+        PG.Execute;
+        // Move
+        if AsMove then
+        begin
+          for i := FL.Count - 1 downto 0 do
+          begin
+            PG.UpdateValue(FL.Count - i + 1, 'Delete ' + FL[i].Name);
+            DeleteFile(IncludeTrailingPathDelimiter(FCurrentPath) + ExcludeTrailingPathDelimiter(FL[i].Name));
+          end;
+          Update(True);
+        end;
       end;
-      OtherSide.FArchiveDir.Free;
-      OtherSide.FArchiveDir := nil;
       OtherSide.CheckForArchiveEnter(OtherSide.FArchiveName);
       OtherSide.Update(True);
     end;
   finally
+    PG.Free;
     DeleteAll(TempName + ExcludeTrailingPathDelimiter(BasePath));
     FL.Free;
     FreeMem(Buffer);
@@ -1057,10 +1093,13 @@ var
   cmd: string;
 begin
   Result := False;
-  if InArchive then
-    Exit;
   if not FileExists('c:lha') then
     Exit;
+  if InArchive then
+  begin
+    FArchiveDir.Free;
+    FArchiveDir := nil;
+  end;
   if LowerCase(ExtractFileExt(AName)) = '.lha' then
   begin
     TempName := GetTempFileEvent('t:', '.mcamiga');
@@ -1099,6 +1138,11 @@ begin
     while CurPos < SL.Count do
     begin
       AFName := Trim(SL[CurPos]);
+      if AFName[1] = ':' then
+      begin
+        CurPos := CurPos + 1;
+        AFName := Trim(SL[CurPos]);
+      end;
       if (AFName = '') or (Pos('----', AFName) = 1) then
         Break;
       IsDir := AFName[Length(AFName)] = '/';
@@ -1267,17 +1311,34 @@ end;
 //############ Make Dir
 procedure TFileList.MakeDir;
 var
-  NewName: string;
+  NewName, cmd: string;
+  SL: TStringList;
 begin
   if FCurrentPath = '' then
     Exit;
-  NewName := 'NewDir';
+  NewName := '';
   if AskForName('Name for the new directory: ', NewName) then
   begin
-    if not SysUtils.CreateDir(IncludeTrailingPathDelimiter(FCurrentPath) + NewName) then
-      ShowMessage('Unable to create dir "' + NewName + '"');
-    Update(True);
-    ActivateFile(IncludeTrailingPathDelimiter(NewName));
+    if InArchive then
+    begin
+      CreateDir('T:' + NewName);
+      SL := TStringList.Create;
+      SL.Add(' ');
+      Sl.SaveToFile(IncludeTrailingPathDelimiter('T:' + NewName) + 'delete_me');
+      cmd := 'c:lha a ' + FArchiveName + ' ' + IncludeTrailingPathDelimiter('T:' + NewName) + 'delete_me';
+      SystemTags(PChar(cmd), [TAG_DONE]);
+      CheckForArchiveEnter(FArchiveName);
+      DeleteFile(IncludeTrailingPathDelimiter('T:' + NewName) + 'delete_me');
+      DeleteFile('T:' + NewName);
+      Update(True);
+    end
+    else
+    begin
+      if not SysUtils.CreateDir(IncludeTrailingPathDelimiter(FCurrentPath) + NewName) then
+        ShowMessage('Unable to create dir "' + NewName + '"');
+      Update(True);
+      ActivateFile(IncludeTrailingPathDelimiter(NewName));
+    end;
   end
   else
     Update(False);
@@ -1298,12 +1359,12 @@ begin
   ABasePath := ExcludeTrailingPathDelimiter(Copy(BasePath, Pos(#10, BasePath) + 1, Length(BasePath)));
   if Assigned(CountPG) then
     CountPG.UpdateValue(0, ABasePath + ' ' + IntToStr(Files + Dirs));
-  if ABasePath <> '' then
+  CDir := FArchiveDir;
+  if ABasePath + AName <> '' then
   begin
     Parts := TStringList.Create;
     FullPath := IncludeTrailingPathDelimiter(ABasePath) + AName;
     ExtractStrings(['/'], [], PChar(FullPath), Parts);
-    CDir := FArchiveDir;
     for i := 0 to Parts.Count - 1 do
     begin
       AE := CDir.EntryByName(Parts[i]);
@@ -1458,8 +1519,6 @@ begin
         begin
           SystemTags(PChar('c:lha d -K ' + FArchiveName + ' ' + s + ExcludeTrailingPathDelimiter(FL[i].Name)), [TAG_END]);
         end;
-        FArchiveDir.Free;
-        FArchiveDir := nil;
         CheckForArchiveEnter(FArchiveName);
         Update(True);
       end;
@@ -1530,8 +1589,6 @@ begin
             cmd := 'c:lha a "' + FArchiveName + '" "T:' + BasePath + NewName  + '"';
             SystemTags(PChar(cmd), [TAG_END]);
             DeleteAll('T:');
-            FArchiveDir.Free;
-            FArchiveDir := nil;
             CheckForArchiveEnter(FArchiveName);
           end
           else
@@ -1915,7 +1972,7 @@ begin
   if InArchive then
   begin
     try
-      ExtractSelectedFiles;
+      ExtractSelectedFiles(False);
     except
     end;
     Update(False);
@@ -1925,7 +1982,7 @@ begin
   if OtherSide.InArchive then
   begin
     try
-      PackSelectedFiles;
+      PackSelectedFiles(False);
     except
     end;
     Update(False);
@@ -2170,6 +2227,26 @@ var
   Res: TDialogResult;
   Target: string;
 begin
+  if InArchive then
+  begin
+    try
+      ExtractSelectedFiles(True);
+    except
+    end;
+    Update(False);
+    OtherSide.Update(True);
+    Exit;
+  end;
+  if OtherSide.InArchive then
+  begin
+    try
+      PackSelectedFiles(True);
+    except
+    end;
+    Update(False);
+    OtherSide.Update(True);
+    Exit;
+  end;
   Target := OtherSide.CurrentPath;
   Res := mrNone;
   FL := TEntryList.Create;
