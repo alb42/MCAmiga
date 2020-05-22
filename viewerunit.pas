@@ -26,6 +26,7 @@ type
   TFileViewer = class
   private
     Buffer: PByte;
+    BufferSize: Int64;
     NumBytes: LongWord;
     Num4BytesPerLine: LongWord;
     NumBytesPerLine: LongWord;
@@ -35,8 +36,7 @@ type
     Mode: TViewerMode;
     FileName: string;
     FStartLine: Integer;
-    OrigText: TStringList;
-    ShownText: TStringList;
+    LineStarts: TList;
     function PollNextKey: TKeyEvent;
     procedure GotMouseEvent(Me: TMouseEvent);
     procedure FormatText;
@@ -47,8 +47,11 @@ type
     procedure GoToLineNumber;
 
   private
+    MemLine: PChar;
+    MemLineLength: Integer;
     LastBinSearch: string;
     procedure SearchBinary;
+    function GetTextLine(Line: Integer): string;
     procedure FindBinary(SearchString: string; FromWhere: Integer);
   private
     FromSel, ToSel: TPoint;
@@ -148,28 +151,43 @@ end;
 
 procedure TFileViewer.FormatText;
 var
-  i, p: Integer;
+  i: Integer;
   s: String;
+  P: PByte;
+  LastSpace: LongInt;
+  LineStart: LongInt;
 begin
-  ShownText.Clear;
-  ShownText.Assign(OrigText);
-  i := 0;
-  while i < ShownText.Count do
+  LineStarts.Clear;
+  P := Buffer;
+  LineStarts.Add(P);
+  LineStart := 0;
+  LastSpace := -1;
+  for i := 0 to BufferSize - 1 do
   begin
-    s := StringReplace(ShownText[i], #9, '  ', [rfReplaceAll]);
-    ConvertText(s);
-    if Length(s) > ScreenWidth then
+    if p[i] in [20, 9] then
+      LastSpace := i;
+    if p[i] = 10 then
     begin
-      P := LastDelimiter(' ', Copy(s, 1, ScreenWidth));
-      if p <= 1 then
-        p := ScreenWidth;
-      ShownText[i] := Copy(s, 1, p);
-      Delete(s, 1, p);
-      ShownText.Insert(i + 1, s);
-    end
-    else
-      ShownText[i] := s;
-    Inc(i);
+      if i < BufferSize - 1 then
+      begin
+        LineStarts.Add(@(p[i + 1]));
+        LineStart := i + 1;
+      end;
+    end;
+    if (i - LineStart >= ScreenWidth) then
+    begin
+      if LastSpace > 0 then
+      begin
+        LineStarts.Add(@(p[LastSpace]));
+        LineStart := LastSpace;
+        LastSpace := -1
+      end
+      else
+      begin
+        LineStarts.Add(@(p[i]));
+        LineStart := i;
+      end;
+    end;
   end;
 end;
 
@@ -192,7 +210,7 @@ begin
   // draw
   BGPen := Cyan;
   FGPen := Black;
-
+  //
   for i := 0 to ScreenWidth - 1 do
   begin
     SetChar(i, 0, ' ');
@@ -203,16 +221,21 @@ begin
 
   if Mode = vmText then
   begin
-    s :=  IntToStr(StartLine + 1) + ' - ' + IntToStr(Min(ShownText.Count, (StartLine + 1) + (ScreenHeight - 2))) + '/' + IntToStr(ShownText.Count);
+    s :=  IntToStr(StartLine + 1) + ' - ' + IntToStr(Min(LineStarts.Count, (StartLine + 1) + (ScreenHeight - 2))) + '/' + IntToStr(LineStarts.Count);
     SetText(ScreenWidth - Length(s), 0, s);
 
     BGPen := Blue;
     FGPen := White;
     for i := 0 to ScreenHeight - 2 do
     begin
-      if i + StartLine < ShownText.Count then
+      if i + StartLine < LineStarts.Count then
       begin
-        s := ShownText[i + StartLine];
+        s := GetTextLine(i + StartLine);
+        {for j := 0 to Min(ScreenWidth - 1, MemLineLength - 1) do
+        begin
+          BGPen := Blue;
+          SetChar(j, i + 1, MemLine[j]);
+        end;}
         l := Length(s);
         if InRange(i + StartLine, FromSel.Y, ToSel.Y) then
         begin
@@ -344,7 +367,7 @@ begin
   FStartLine := Max(AValue, 0);
   if Mode = vmText then
   begin
-    FStartLine := Min(FStartLine, Max(ShownText.Count - ScreenHeight + 1, 0));
+    FStartLine := Min(FStartLine, Max(LineStarts.Count - ScreenHeight + 1, 0));
     Paint;
   end
   else
@@ -356,37 +379,16 @@ begin
 end;
 
 procedure TFileViewer.SwitchMode;
-var
-  FS: TFileStream;
 begin
   FStartLine := 0;
   case Mode of
     vmText: begin
       Mode := vmHex;
-      ShownText.Clear;
-      FS := TFileStream.Create(FileName, fmOpenRead);
-      try
-        If Assigned(Buffer) then
-          FreeMem(Buffer);
-        GetMem(Buffer, FS.Size);
-        FS.Position := 0;
-        NumBytes := FS.Size;
-        FS.Read(Buffer^, FS.Size);
-      finally
-        FS.Free;
-      end;
       Paint;
     end;
     vmHex: begin
       Mode := vmText;
-      if Assigned(Buffer) then
-        FreeMem(Buffer);
-      if OrigText.Count = 0 then
-      begin
-        OrigText.LoadFromFile(Filename);
-        FormatText;
-      end;
-      Buffer := nil;
+      FormatText;
       Paint;
     end;
   end;
@@ -399,7 +401,7 @@ begin
   if Mode = vmText then
   begin
     NewLine := 1;
-    if AskForNumber('Goto line (1 to ' + IntToStr(ShownText.Count)  +')', NewLine) then
+    if AskForNumber('Goto line (1 to ' + IntToStr(LineStarts.Count)  +')', NewLine) then
       StartLine := NewLine - 1
     else
       Paint;
@@ -430,6 +432,26 @@ begin
   end;
 
   Paint;
+end;
+
+function TFileViewer.GetTextLine(Line: Integer): string;
+var
+  StartPC, EndPC: PByte;
+  i: Integer;
+begin
+  StartPC := LineStarts[Line];
+  if Line + 1 >= LineStarts.Count then
+    EndPC := Buffer + BufferSize
+  else
+    EndPC := LineStarts[Line + 1];
+  FillChar(MemLine^, MemLineLength, 0);
+  Move(StartPC^, MemLine^, Min(MemLineLength, EndPC - StartPC - 1));
+  for i := 0 to Min(MemLineLength, EndPC - StartPC - 1) - 1 do
+  begin
+    if MemLine[i] = #0 then
+      MemLine[i] := '.';
+  end;
+  Result := MemLine;
 end;
 
 procedure TFileViewer.FindBinary(SearchString: string; FromWhere: Integer);
@@ -531,9 +553,9 @@ begin
   FromSel := Point(-1,-1);
   ToSel := Point(-1,-1);
   Found := False;
-  for i := FromWhere.Y to ShownText.Count - 1 do
+  for i := FromWhere.Y to LineStarts.Count - 1 do
   begin
-    s := ShownText[i];
+    s := GetTextLine(i);
     if i = FromWhere.Y then
       for x := 1 to FromWhere.X - 1 do
         s[x] := #0;
@@ -557,8 +579,8 @@ end;
 
 constructor TFileViewer.Create;
 begin
-  OrigText := TStringList.Create;
-  ShownText := TStringList.Create;
+  MemLine := nil;
+  LineStarts := TList.Create;
   Mode := vmText;
   NumBytesPerLine := 16;
   FUntilByte := 0;
@@ -568,10 +590,9 @@ end;
 
 destructor TFileViewer.Destroy;
 begin
-  OrigText.Clear;
-  ShownText.Clear;
-  if Assigned(Buffer) then
-    FreeMem(BUffer);
+  LineStarts.Free;
+  FreeMem(Buffer);
+  FreeMem(MemLine);
   inherited Destroy;
 end;
 
@@ -589,14 +610,25 @@ var
   MaxMagic, i: Integer;
   IsASCII: Boolean;
 begin
+  MemLineLength := ScreenWidth + 10;
+  MemLine := AllocMem(MemLineLength);
+  //
   FileName := AFilename;
-  OrigText.Clear;
+  LineStarts.Clear;
   Magic[0] := 0;
   FS := TFileStream.Create(FileName, fmOpenRead);
   MaxMagic := FS.Read(Magic[0], Length(Magic));
+  FS.Position := 0;
+  BufferSize := FS.Size;
+  NumBytes := BufferSize;
+  Buffer := AllocMem(BufferSize);
+  if not Assigned(Buffer) then
+    Exit;
+  FS.Read(Buffer^, FS.Size);
   FS.Free;
   IsASCII := True;
-  if FS.Size > 1024*1024 then
+  //
+  if BufferSize > 1024*1024 then
   begin
     IsASCII := False
   end
@@ -611,7 +643,6 @@ begin
     end;
   if IsASCII then
   begin
-    OrigText.LoadFromFile(FileName);
     FStartLine := 0;
     FormatText;
     Paint;
