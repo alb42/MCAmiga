@@ -115,11 +115,11 @@ type
     CancelPressed: Boolean;
   protected
     procedure DrawButtons; override;
-    procedure Paint; override;
     procedure ProcessMouse(MouseEvent: TMouseEvent); override; // click to ok
   public
     MaxValue: LongWord;
     Text: string;
+    procedure Paint; override;
     function Execute: TDialogResult; override;
     function UpdateValue(AValue: LongWord; NText: string = ''): Boolean; virtual;
   end;
@@ -129,11 +129,11 @@ type
   TDoubleProgress = class(TSingleProgress)
   protected
     CurValue2: LongWord;
-    procedure Paint; override;
   public
     MaxValue2: LongWord;
     Text2: string;
     function Execute: TDialogResult; override;
+    procedure Paint; override;
     function UpdateValue(AValue: LongWord; NText: string = ''): Boolean; override;
     function UpdateValue2(AValue1: LongWord; NText1: string = ''; AValue2: LongWord = 0; NText2: string = ''): Boolean;
   end;

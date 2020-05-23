@@ -1131,9 +1131,9 @@ begin
       Exit;
     end;
     CurPos := CurPos + 1;
-    if Pos('Original', SL[CurPos]) <> 1 then
+    if Pos('Original', SL[CurPos]) < 0 then
     begin
-      writeln('original not found');
+      writeln('Original not found');
       writeln(SL.Text);
       Exit;
     end;
@@ -2044,6 +2044,7 @@ begin
               {$endif}
               if not AskQuestion('File "' + FL[0].Name +'" already exists, Overwrite?'#13#10 + OverwriteText(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name, IncludeTrailingPathDelimiter(Target) + FL[0].Name)) then
                 Exit;
+              PG.Paint;
             end;
             Src := TFileStream.Create(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name, fmOpenRead);
             Dest := TFileStream.Create(IncludeTrailingPathDelimiter(Target) + FL[0].Name, fmCreate);
@@ -2074,7 +2075,7 @@ begin
               Src.Free;
               Src := nil;
               // only delete the file if the dest was created ;)
-              if Assigned(nil) then
+              if Assigned(Dest) then
               begin
                 Dest.Free;
                 Dest := nil;
@@ -2141,7 +2142,10 @@ begin
                     raise Exception.Create('Can''t copy on itself');
                   {$endif}
                   if Res = mrNone then
+                  begin
                     Res := AskMultipleQuestion('File "' + FL[i].Name +'" already exists, Overwrite?'#13#10 + OverwriteText(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name, IncludeTrailingPathDelimiter(Target) + FL[i].Name));
+                    PG2.Paint;
+                  end;
                   case Res of
                     mrOK: begin Res := mrNone; end;
                     mrCancel: begin Res := mrNone; Continue; end;
@@ -2378,7 +2382,7 @@ begin
               Src.Free;
               Src := nil;
               // only delete the file if the dest was created ;)
-              if Assigned(nil) then
+              if Assigned(Dest) then
               begin
                 Dest.Free;
                 Dest := nil;
