@@ -714,7 +714,7 @@ begin
     //
   finally
     FreeMem(Buffer);
-    //DeleteAll(TempName);
+    DeleteAll(TempName);
     SFile.Free;
     DFile.Free;
     SL.Free;
