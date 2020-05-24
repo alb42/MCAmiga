@@ -7,7 +7,11 @@ uses
   {$ifdef RELEASE}
   Versioncheck,
   {$endif}
-  Types, SysUtils, Video, mouse, keyboard, FileListUnit, dialogunit, EventUnit, archiveunit, toolsunit;
+  Types, SysUtils, Video, mouse, keyboard, FileListUnit, dialogunit, EventUnit, archiveunit,
+  {$if defined(Amiga68k) or defined(MorphOS)}
+  xad, xadarchive,
+  {$endif}
+  toolsunit;
 
 var
   Src: TFileList;
