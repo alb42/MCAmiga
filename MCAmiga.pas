@@ -7,7 +7,7 @@ uses
   {$ifdef RELEASE}
   Versioncheck,
   {$endif}
-  Types, SysUtils, Video, mouse, keyboard, FileListUnit, dialogunit, EventUnit;
+  Types, SysUtils, Video, mouse, keyboard, FileListUnit, dialogunit, EventUnit, archiveunit, toolsunit;
 
 var
   Src: TFileList;

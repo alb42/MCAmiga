@@ -598,7 +598,7 @@ end;
 
 function IsASCIIByte(a: Byte): Boolean; inline;
 begin
-  Result := a in [9, 10, 13, 26, 32..127];
+  Result := a in [9, 10, 13, 26, 32..127, 169];
 end;
 
 procedure TFileViewer.Execute(AFilename: string);
@@ -637,6 +637,7 @@ begin
     begin
       if not IsASCIIByte(Magic[i]) then
       begin
+        writeln('not ASCII ', Magic[i]);
         IsASCII := False;
         Break;
       end;
