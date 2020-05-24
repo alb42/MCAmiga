@@ -199,15 +199,33 @@ end;
 function GetStrToolType(DObj: PDiskObject; Entry: string; Default: string): string;
 var
   Res: PChar;
+  {$ifdef AROS}
+  TT: PPchar;
+  s: string;
+  {$endif}
 begin
   Result := Default;
   if not assigned(Dobj) then
     Exit;
   if not Assigned(Dobj^.do_Tooltypes) then
     Exit;
+  {$ifdef AROS}
+  TT := Dobj^.do_Tooltypes;
+  while Assigned(TT^) do
+  begin
+    s := TT^;
+    if (Pos('=', s) > 0) and (Trim(Copy(s, 1, Pos('=', s) - 1)) = Entry) then
+    begin
+      Result := copy(s, Pos('=', s) + 1, Length(s));
+      Break;
+    end;
+    Inc(TT);
+  end;
+  {$else}
   Res := FindToolType(Dobj^.do_Tooltypes, PChar(Entry));
   if Assigned(Res) then
     Result := Res;
+  {$endif}
 end;
 {$endif}
 

@@ -745,7 +745,7 @@ begin
         //
         PG.Free;
         PG := TSingleProgress.Create;
-        PG.Text := 'Pack files to LHA';
+        PG.Text := 'Pack files to Archive';
         PG.MaxValue := FL.Count;
         PG.Execute;
         // Move
@@ -1057,12 +1057,12 @@ begin
         PG.UpdateValue(i + 1, 'Pack ' + FFileList[i].Name + ' to '+ ArchiveName[Format] +'...');
         FileNameToPack := '';
         if FL[i].EType = etDir then
-          FilenameToPack := '"' + IncludeTrailingPathDelimiter(FL[i].Name) + '#?"';
+          FilenameToPack := '"' + IncludeTrailingPathDelimiter(FL[i].Name) + {$ifndef AROS}'#?' + {$endif}'"';
         if FL[i].EType = etFile then
           FilenameToPack := '"' + FL[i].Name + '"';
         if FilenameToPack = '' then
           Continue;
-        cmd := PackCmd + ' -r -x1 a "' + IncludeTrailingPathDelimiter(OtherSide.CurrentPath) + NewName + '" ' + FilenameToPack;
+        cmd := PackCmd + ' a "' + IncludeTrailingPathDelimiter(OtherSide.CurrentPath) + NewName + '" ' + FilenameToPack;
         SL := TStringList.Create;
         SL.Add('cd ' + FCurrentPath);
         SL.Add(cmd);
