@@ -152,7 +152,6 @@ end;
 procedure TFileViewer.FormatText;
 var
   i: Integer;
-  s: String;
   P: PByte;
   LastSpace: LongInt;
   LineStart: LongInt;
@@ -236,6 +235,7 @@ begin
           BGPen := Blue;
           SetChar(j, i + 1, MemLine[j]);
         end;}
+        ConvertText(s);
         l := Length(s);
         if InRange(i + StartLine, FromSel.Y, ToSel.Y) then
         begin

@@ -36,6 +36,7 @@ type
   TArchiveBase = class
   protected
     FArchiveName: string;
+    function GetIsReadOnly: Boolean; virtual;
   public
     AD: TArchiveDir;
     constructor Create; virtual;
@@ -56,6 +57,7 @@ type
     class function Prio: LongInt; virtual;
 
     property ArchiveName: string read FArchiveName;
+    property IsReadOnly: Boolean read GetIsReadOnly;
   end;
 
   TArchiveClass = class of TArchiveBase;
@@ -840,6 +842,11 @@ begin
 end;
 
 { TArchiveBase }
+
+function TArchiveBase.GetIsReadOnly: Boolean;
+begin
+  Result := False;
+end;
 
 constructor TArchiveBase.Create;
 begin

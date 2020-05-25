@@ -5,7 +5,7 @@ unit xadarchive;
 interface
 
 uses
-  Classes, SysUtils, ArchiveUnit, xad, Utility, EXEC;
+  Classes, SysUtils, ArchiveUnit, xad, Utility;
 
 type
   { TxadArchive }
@@ -13,6 +13,8 @@ type
   TxadArchive = class(TArchiveBase)
   private
     Ai: PxadArchiveInfo;
+  protected
+    function GetIsReadOnly: Boolean; override;
   public
     function ReadArchive(AFilename: string): Boolean; override;
     function PackFile(AFileName: string; FilePathInArchive: string): Boolean; override;
@@ -33,6 +35,11 @@ type
 implementation
 
 { TxadArchive }
+
+function TxadArchive.GetIsReadOnly: Boolean;
+begin
+  Result := True;
+end;
 
 function TxadArchive.ReadArchive(AFilename: string): Boolean;
 var
@@ -110,7 +117,7 @@ end;
 
 function TxadArchive.PackFile(AFileName: string; FilePathInArchive: string): Boolean;
 begin
-
+  Result := False;
 end;
 
 function TxadArchive.ExtractFile(FilePathInArchive: string; DestFilename: string): Boolean;
@@ -118,7 +125,6 @@ var
   Fi: PxadFileInfo;
   Buffer: Pointer;
   FS: TFileStream;
-  ReadBytes: LongInt;
 begin
   Fi := Ai^.xai_FileInfo;
   while Assigned(Fi) do
@@ -153,22 +159,22 @@ end;
 
 function TxadArchive.DeleteFile(AFileName: string): Boolean;
 begin
-
+  Result := False;
 end;
 
 function TxadArchive.CreateDir(ADirName: string): Boolean;
 begin
-
+  Result := False;
 end;
 
 function TxadArchive.RenameFile(OldFile: string; NewFile: string): Boolean;
 begin
-
+  Result := False;
 end;
 
 function TxadArchive.RenameDir(OldDir: string; NewDir: string): Boolean;
 begin
-
+  Result := False;
 end;
 
 class function TxadArchive.FileIsArchive(AFileName: string): Boolean;
@@ -194,7 +200,11 @@ end;
 
 class function TxadArchive.Prio: LongInt;
 begin
-  Result := 100; // higher than any other
+  {$ifdef AROS}
+  Result := 100; // higher than any other, becasue LHA on AROS is very limited not even possibnle to extract a single file
+  {$else}
+  Result := -100; // lower than ayn other any other, becasue it only can read, not write
+  {$endif}
 end;
 
 constructor TxadArchive.Create;

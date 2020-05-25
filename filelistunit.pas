@@ -1090,6 +1090,9 @@ begin
   if FCurrentPath = '' then
     Exit;
   NewName := '';
+  if InArchive and FArchive.IsReadOnly then
+    ShowMessage('Writing for that type is not supported');
+  //
   if AskForName('Name for the new directory: ', NewName) then
   begin
     if InArchive then
@@ -1277,6 +1280,11 @@ begin
     // special routine
     if InArchive then
     begin
+      if FArchive.IsReadOnly then
+      begin
+        ShowMessage('Delete for that type is not supported');
+        Exit;
+      end;
       DoListOfSelectedFile(True, FL, dirs, files, Size);
       if AskQuestion('Delete from archive ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files (' + Trim(FormatSize(Size)) + 'byte)?') then
       begin
@@ -1346,6 +1354,13 @@ procedure TFileList.Rename;
 var
   NewName, OldName, BasePath: string;
 begin
+  if InArchive and FArchive.IsReadOnly then
+  begin
+    ShowMessage('Writing for that type is not supported');
+    Update(False);
+    OtherSide.Update(False);
+    Exit;
+  end;
   if InRange(FActiveElement, 0, FFileList.Count - 1) then
   begin
     if FFileList[FActiveElement].EType in [etDir, etFile] then
@@ -1533,7 +1548,7 @@ end;
 
 procedure TFileList.ViewFile(OpenWithProgram: string = '');
 var
-  FileN, BasePath, TempName, cmd: string;
+  FileN, BasePath, TempName: string;
   Ret: Integer;
 begin
   if InRange(FActiveElement, 0, FFileList.Count - 1) then
@@ -1758,7 +1773,10 @@ begin
   if OtherSide.InArchive then
   begin
     try
-      PackSelectedFiles(False);
+      if OtherSide.FArchive.IsReadOnly then
+        ShowMessage('Writing for that type is not supported')
+      else
+        PackSelectedFiles(False);
     except
     end;
     Update(False);
@@ -2010,7 +2028,10 @@ begin
   if InArchive then
   begin
     try
-      ExtractSelectedFiles(True);
+      if OtherSide.FArchive.IsReadOnly then
+        ShowMessage('Writing for that type is not supported')
+      else
+        ExtractSelectedFiles(True);
     except
     end;
     Update(False);
