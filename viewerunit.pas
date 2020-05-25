@@ -637,7 +637,7 @@ begin
     begin
       if not IsASCIIByte(Magic[i]) then
       begin
-        writeln('not ASCII ', Magic[i]);
+        //writeln('not ASCII ', Magic[i]);
         IsASCII := False;
         Break;
       end;

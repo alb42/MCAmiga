@@ -1,5 +1,5 @@
 unit xad;
-
+{$mode objfpc}
 interface
 {$PACKRECORDS 2}
 uses
@@ -941,6 +941,35 @@ function xadGetFilenameA(BufferSize: LongWord location 'd0'; Buffer: STRPTR loca
 function xadConvertNameA(Charset: LongWord location 'd0'; Tags: PTagItem location 'a0'): STRPTR; syscall XADMasterBase 174;
 {$endif}
 
+{$ifdef AROS}
+function xadAllocObjectA(Type_: LongInt; Tags: PTagItem): APTR; syscall XADMasterBase 5;
+procedure xadFreeObjectA(Object_: APTR; Tags: PTagItem); syscall XADMasterBase 6;
+function xadRecogFileA(Size: LongWord; Memory: APTR; Tags: PTagItem): PxadClient; syscall XADMasterBase 7;
+function xadGetInfoA(ai: PxadArchiveInfo; Tags: PTagItem): LongInt; syscall XADMasterBase 8;
+procedure xadFreeInfo(ai: PxadArchiveInfo); syscall XADMasterBase 9;
+function xadFileUnArcA(ai: PxadArchiveInfo; Tags: PTagItem): LongInt; syscall XADMasterBase 10;
+function xadDiskUnArcA(ai: PxadArchiveInfo; Tags: PTagItem): LongInt; syscall XADMasterBase 11;
+function xadGetErrorText(errnum: LongWord): STRPTR; syscall XADMasterBase 12;
+function xadGetClientInfo(): PxadClient; syscall XADMasterBase 13;
+function xadHookAccess(Command: LongWord; Data: LongInt; Buffer: APTR; ai: PxadArchiveInfo): LongInt; syscall XADMasterBase 14;
+function xadConvertDatesA(Tags: PTagItem): LongInt; syscall XADMasterBase 15;
+function xadCalcCRC16(id: LongWord; Init: LongWord; Size: LongWord; Buffer: STRPTR): Word; syscall XADMasterBase 16;
+function xadCalcCRC32(id: LongWord; Init: LongWord; Size: LongWord; Buffer: STRPTR): LongWord; syscall XADMasterBase 17;
+function xadAllocVec(Size: LongWord; Flags: LongWord): APTR; syscall XADMasterBase 18;
+procedure xadCopyMem(Src: Pointer; Dest: Pointer; Size: LongWord); syscall XADMasterBase 19;
+function xadHookTagAccessA(Command: LongWord; Data: LongInt; Buffer: APTR; ai: PxadArchiveInfo; Tags: PTagItem): LongInt; syscall XADMasterBase 20;
+function xadConvertProtectionA(Tags: PTagItem): LongInt; syscall XADMasterBase 21;
+function xadGetDiskInfoA(ai: PxadArchiveInfo; Tags: PTagItem): LongInt; syscall XADMasterBase 22;
+function xadGetHookAccessA(ai: PxadArchiveInfo; Tags: PTagItem): LongInt; syscall XADMasterBase 23;
+function xadFreeHookAccessA(ai: PxadArchiveInfo; Tags: PTagItem): LongInt; syscall XADMasterBase 24;
+function xadAddFileEntryA(fi: PxadFileInfo; ai: PxadArchiveInfo; Tags: PTagItem): LongInt; syscall XADMasterBase 25;
+function xadAddDiskEntryA(di: PxadDiskInfo; ai: PxadArchiveInfo; Tags: PTagItem): LongInt; syscall XADMasterBase 26;
+function xadGetFilenameA(BufferSize: LongWord; Buffer: STRPTR; Path: STRPTR; Name: STRPTR; Tags: PTagItem): LongInt; syscall XADMasterBase 27;
+function xadConvertNameA(Charset: LongWord; Tags: PTagItem): STRPTR; syscall XADMasterBase 28;
+//function xadGetDefaultNameA(Tags: PTagItem): STRPTR; syscall XADMasterBase 29;
+//function xadGetSystemInfo(): PxadSystemInfo; syscall XADMasterBase 30;
+{$endif}
+
 
 function xadAllocObject(Type_: LongInt; const TagList: array of PtrUInt): APTR;
 procedure xadFreeObject(Object_: APTR; const TagList: array of PtrUInt);
@@ -952,7 +981,9 @@ function xadConvertDates(const TagsList: array of PtrUInt): LongInt;
 function xadHookTagAccess(Command: LongWord; Data: LongInt; Buffer: APTR; ai: PxadArchiveInfo; const TagsList: array of PtrUInt): LongInt;
 function xadConvertProtection(const TagsList: array of PtrUInt): LongInt;
 function xadGetDiskInfo(ai: PxadArchiveInfo; const TagsList: array of PtrUInt): LongInt;
+{$if defined(Amiga68k) or defined(MorphOS)}
 function xadDiskFileUnArc(ai: PxadArchiveInfo; const TagsList: array of PtrUInt): LongInt;
+{$endif}
 function xadGetHookAccess(ai: PxadArchiveInfo; const TagsList: array of PtrUInt): LongInt;
 function xadFreeHookAccess(ai: PxadArchiveInfo; const TagsList: array of PtrUInt): LongInt;
 function xadAddFileEntry(fi: PxadFileInfo; ai: PxadArchiveInfo; const TagsList: array of PtrUInt): LongInt;
@@ -1013,10 +1044,12 @@ begin
   Result := xadGetDiskInfoA(ai, @TagsList);
 end;
 
+{$if defined(Amiga68k) or defined(MorphOS)}
 function xadDiskFileUnArc(ai: PxadArchiveInfo; const TagsList: array of PtrUInt): LongInt;
 begin
   Result := xadDiskFileUnArcA(ai, @TagsList);
 end;
+{$endif}
 
 function xadGetHookAccess(ai: PxadArchiveInfo; const TagsList: array of PtrUInt): LongInt;
 begin

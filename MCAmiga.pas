@@ -8,7 +8,7 @@ uses
   Versioncheck,
   {$endif}
   Types, SysUtils, Video, mouse, keyboard, FileListUnit, dialogunit, EventUnit, archiveunit,
-  {$if defined(Amiga68k) or defined(MorphOS)}
+  {$if defined(Amiga68k) or defined(MorphOS) or defined(AROS)}
   xad, xadarchive,
   {$endif}
   toolsunit;

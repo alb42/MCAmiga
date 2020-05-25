@@ -98,7 +98,7 @@ type
 
 // Search for the archiver class for this archive
 function GetArchiver(AFilename: string): TArchiveClass;
-
+procedure RegisterArchiver(ArchiveClass: TArchiveClass);
 
 implementation
 uses
