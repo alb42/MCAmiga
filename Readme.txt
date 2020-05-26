@@ -8,6 +8,23 @@ if the font is too big try to set the Environment variable FPC_VIDEO_BUILTINFONT
 e.g. echo vga8 >env:FPC_VIDEO_BUILTINFONT
 and restart the program, or create it in Envarc: to make it available as default.
 
+Requirements:
+#############
+
+AmigaOS 3.x, 68020, 4 MB RAM
+AmigaOS 4.x PowerPC (except X5000)
+MorphOS 3.x PowerPC
+AROS i386-ABIv0, RasPi1-3 ARM ABIv0, x64 ABIv1 NonSMP
+
+Needed Assigns:
+---------------
+ENV: T:
+
+Optional
+--------
+lha, lzx commands in c:
+(AROS's lha is incompatible, use xad)
+installed xadmaster.library to read other archive types
 
 Keys:
 #####
