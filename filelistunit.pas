@@ -17,7 +17,7 @@ type
 const
   AmigaExecMagic = $03F3;
 
-  ArchiveCmd: array[TArchiveType] of string = ('c:lha', 'c:lzx');
+  ArchiveCmd: array[TArchiveType] of string = ('c:lha -r - x1', 'c:lzx -r -x1');
   ArchiveName: array[TArchiveType] of string = ('LHA', 'LZX');
   ArchiveExt: array[TArchiveType] of string = ('.lha', '.lzx');
 
@@ -929,15 +929,6 @@ begin
             if AskForName('Parameter:', Params, False) then
             begin
               NonWaitMessage('Starting ' + FFileList[FActiveElement].Name);
-              {$ifdef MorphOS}
-              if NativeUInt(DosOutPut) = 0 then
-                PProcess(FindTask(nil))^.pr_COS := BPTR(MOS_ConHandle);
-              {$else}
-                {$ifdef HASAMIGA}
-                if NativeUInt(DosOutPut) = 0 then
-                  PProcess(FindTask(nil))^.pr_COS := BPTR(AOS_ConHandle);
-                {$endif}
-              {$endif}
               Ret := ExecuteProcess(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name, [Params]);
               if Ret <> 0 then
                 ShowMessage(FFileList[FActiveElement].Name + ' returned with error message: ' + IntToStr(Ret));
@@ -1070,7 +1061,7 @@ begin
         SL.Free;
         //
         cmd := 'c:execute ' + TempName;
-        SystemTags(PChar(cmd), [TAG_END]);
+        SystemTags(PChar(cmd), [SYS_OUTPUT, 0, TAG_END]);
         DeleteFile(TempName);
       end;
     end;
@@ -2320,6 +2311,14 @@ end;
 
 
 initialization
-
+{$ifdef MorphOS}
+if NativeUInt(DosOutPut) = 0 then
+  PProcess(FindTask(nil))^.pr_COS := BPTR(MOS_ConHandle);
+{$else}
+  {$ifdef HASAMIGA}
+  if NativeUInt(DosOutPut) = 0 then
+    PProcess(FindTask(nil))^.pr_COS := BPTR(AOS_ConHandle);
+  {$endif}
+{$endif}
 end.
 

@@ -294,7 +294,7 @@ begin
     FreeAndNil(SL);
     //
     cmd := 'c:execute ' + IncludeTrailingPathDelimiter(TempName) + 'cmdadd';
-    SystemTags(PChar(cmd), [TAG_END]);
+    SystemTags(PChar(cmd), [SYS_OUTPUT, 0, TAG_END]);
     //
     Result := True;
     //
@@ -335,7 +335,7 @@ begin
     FreeAndNil(SL);
     //
     cmd := 'c:execute ' + IncludeTrailingPathDelimiter(TempName) + 'cmdadd';
-    SystemTags(PChar(cmd), [TAG_END]);
+    SystemTags(PChar(cmd), [SYS_OUTPUT, 0, TAG_END]);
 
     SFile := TFileStream.Create(IncludeTrailingPathDelimiter(TempName) + FilePathInArchive, fmOpenRead);
     DFile := TFileStream.Create(DestFilename, fmCreate);
@@ -362,7 +362,7 @@ var
   cmd: string;
 begin
   cmd := 'c:lzx d "' + FArchiveName + '" "' + AFileName + '"';
-  SystemTags(PChar(cmd), [TAG_END]);
+  SystemTags(PChar(cmd), [SYS_OUTPUT, 0, TAG_END]);
   Result := True;
 end;
 
@@ -389,7 +389,7 @@ begin
     FreeAndNil(SL);
     //
     cmd := 'c:execute ' + IncludeTrailingPathDelimiter(TempName) + 'cmdadd';
-    SystemTags(PChar(cmd), [TAG_END]);
+    SystemTags(PChar(cmd), [SYS_OUTPUT, 0, TAG_END]);
     Result := True;
   finally
     SL.Free;
@@ -418,7 +418,7 @@ begin
     FreeAndNil(SL);
     //
     cmd := 'c:execute ' + IncludeTrailingPathDelimiter(TempName) + 'cmdadd';
-    SystemTags(PChar(cmd), [TAG_END]);
+    SystemTags(PChar(cmd), [SYS_OUTPUT, 0, TAG_END]);
     //
     Result := True;
   finally
@@ -448,7 +448,7 @@ begin
     FreeAndNil(SL);
     //
     cmd := 'c:execute ' + IncludeTrailingPathDelimiter(TempName) + 'cmdadd';
-    SystemTags(PChar(cmd), [TAG_END]);
+    SystemTags(PChar(cmd), [SYS_OUTPUT, 0, TAG_END]);
     //
     Result := True;
   finally
@@ -652,12 +652,12 @@ begin
     //
     SL := TStringList.Create;
     SL.Add('cd ' + TempName);
-    SL.Add('c:lha a "' + FArchiveName + '" "' + FilePathInArchive + '"');
+    SL.Add('c:lha -x1 a "' + FArchiveName + '" "' + FilePathInArchive + '"');
     SL.SaveToFile(IncludeTrailingPathDelimiter(TempName) + 'cmdadd');
     FreeAndNil(SL);
     //
     cmd := 'c:execute ' + IncludeTrailingPathDelimiter(TempName) + 'cmdadd';
-    SystemTags(PChar(cmd), [TAG_END]);
+    SystemTags(PChar(cmd), [SYS_OUTPUT, 0, TAG_END]);
     //
     Result := True;
     //
@@ -701,7 +701,7 @@ begin
     FreeAndNil(SL);
     //
     cmd := 'c:execute ' + IncludeTrailingPathDelimiter(TempName) + 'cmdadd';
-    SystemTags(PChar(cmd), [TAG_END]);
+    SystemTags(PChar(cmd), [SYS_OUTPUT, 0, TAG_END]);
 
     SFile := TFileStream.Create(IncludeTrailingPathDelimiter(TempName) + FilePathInArchive, fmOpenRead);
     DFile := TFileStream.Create(DestFilename, fmCreate);
@@ -728,7 +728,7 @@ var
   cmd: string;
 begin
   cmd := 'c:lha d "' + FArchiveName + '" "' + AFileName + '"';
-  SystemTags(PChar(cmd), [TAG_END]);
+  SystemTags(PChar(cmd), [SYS_OUTPUT, 0, TAG_END]);
   Result := True;
 end;
 
@@ -750,12 +750,12 @@ begin
     //
     SL.Clear;
     SL.Add('cd ' + TempName);
-    SL.Add('c:lha a "' + FArchiveName + '" "' + IncludeTrailingPathDelimiter(NewDir) + 'delete_me' + '"');
+    SL.Add('c:lha -x1 a "' + FArchiveName + '" "' + IncludeTrailingPathDelimiter(NewDir) + 'delete_me' + '"');
     SL.SaveToFile(IncludeTrailingPathDelimiter(TempName) + 'cmdadd');
     FreeAndNil(SL);
     //
     cmd := 'c:execute ' + IncludeTrailingPathDelimiter(TempName) + 'cmdadd';
-    SystemTags(PChar(cmd), [TAG_END]);
+    SystemTags(PChar(cmd), [SYS_OUTPUT, 0, TAG_END]);
     Result := True;
   finally
     SL.Free;
@@ -776,15 +776,15 @@ begin
 
     SL := TStringList.Create;
     SL.Add('cd ' + TempName);
-    SL.Add('c:lha x "' + FArchiveName + '" "' + OldFile + '" ' + '"' + TempName + '"');
+    SL.Add('c:lha -x1 x "' + FArchiveName + '" "' + OldFile + '" ' + '"' + TempName + '"');
     SL.Add('rename "' + OldFile + '" "' + NewFile + '"');
     SL.Add('c:lha d "' + FArchiveName + '" "' + OldFile + '"');
-    SL.Add('c:lha a "' + FArchiveName + '" "' + NewFile + '"');
+    SL.Add('c:lha -x1 a "' + FArchiveName + '" "' + NewFile + '"');
     SL.SaveToFile(IncludeTrailingPathDelimiter(TempName) + 'cmdadd');
     FreeAndNil(SL);
     //
     cmd := 'c:execute ' + IncludeTrailingPathDelimiter(TempName) + 'cmdadd';
-    SystemTags(PChar(cmd), [TAG_END]);
+    SystemTags(PChar(cmd), [SYS_OUTPUT, 0, TAG_END]);
     //
     Result := True;
   finally
@@ -806,15 +806,15 @@ begin
 
     SL := TStringList.Create;
     SL.Add('cd ' + TempName);
-    SL.Add('c:lha x "' + FArchiveName + '" "' + IncludeTrailingPathDelimiter(OldDir) + '#?" ' + '"' + TempName + '"');
+    SL.Add('c:lha -x1 x "' + FArchiveName + '" "' + IncludeTrailingPathDelimiter(OldDir) + '#?" ' + '"' + TempName + '"');
     SL.Add('rename "' + OldDir + '" "' + NewDir + '"');
     SL.Add('c:lha d "' + FArchiveName + '" "' + IncludeTrailingPathDelimiter(OldDir) + '#?"');
-    SL.Add('c:lha a "' + FArchiveName + '" "' + IncludeTrailingPathDelimiter(NewDir) + '#?"');
+    SL.Add('c:lha -x1 a "' + FArchiveName + '" "' + IncludeTrailingPathDelimiter(NewDir) + '#?"');
     SL.SaveToFile(IncludeTrailingPathDelimiter(TempName) + 'cmdadd');
     FreeAndNil(SL);
     //
     cmd := 'c:execute ' + IncludeTrailingPathDelimiter(TempName) + 'cmdadd';
-    SystemTags(PChar(cmd), [TAG_END]);
+    SystemTags(PChar(cmd), [SYS_OUTPUT, 0, TAG_END]);
     //
     Result := True;
   finally

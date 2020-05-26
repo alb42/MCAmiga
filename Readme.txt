@@ -47,6 +47,7 @@ F5       - Copy
 F6       - Move                      Shift F6 - Rename file under cursor
 F7       - Create directory
 F8       - Delete
+Enter    - open lha file, start executable
 
 General:
 --------
@@ -74,7 +75,8 @@ History:
 
 0.5
 - video fixes
-- browse, copy, move, rename, view/edit in lha archives
+- browse, copy, move, rename, view/edit in lha/lzx archives
+- browse, extract, view files from xad supported archive types
 
 0.4
 - mouse control

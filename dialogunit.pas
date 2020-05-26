@@ -156,6 +156,7 @@ type
     procedure LhaPackEvent;
     procedure LzxPackEvent;
     procedure ShellEvent;
+    procedure StartProgEvent;
   protected
     procedure ProcessMouse(MouseEvent: TMouseEvent); override;
     procedure DrawButtons; override;
@@ -202,16 +203,17 @@ const
 
 
 
-const       //.........1.........2.........3.........4.........5........6.........7
+const       //.........1.........2.........3.........4.........5........6.........7.........8
   HelpText = '     MyCommander Amiga Version ' + NumVERSION + ' '+{$INCLUDE %FPCTARGETCPU%} + '-' + {$INCLUDE %FPCTARGETOS%} +'  '#13#10 +
              '   =================================================  '#13#10 +
-             ' F1  - Help              Ins  - Select File'#13#10 +
-             ' F3  - View              +    - Select by pattern'#13#10 +
-             ' F4  - Edit              -    - Deselect by pattern'#13#10 +
-             ' F5  - Copy              TAB  - Switch Focus'#13#10 +
-             ' F6  - Move              Alt F1/F2 - Show Drives'#13#10 +
-             ' F7  - Create Directory  Backspace - Parent'#13#10 +
-             ' F8  - Delete Files      Shift + Enter - Open Dir in other side'#13#10 +
+             ' F1 - Help               Alt F1/F2 - Show Drives'#13#10 +
+             ' F2 - Tools menu         Ins  - Select File'#13#10 +
+             ' F3 - View (Shift alt.)  +    - Select by pattern'#13#10 +
+             ' F4 - Edit (Shift alt.)  -    - Deselect by pattern'#13#10 +
+             ' F5 - Copy               TAB  - Switch Focus'#13#10 +
+             ' F6 - Move               Shift F6 - Rename'#13#10 +
+             ' F7 - Create Directory   Backspace - Parent'#13#10 +
+             ' F8 - Delete Files       Shift + Enter - Open Dir in other side'#13#10 +
              ' F10/ESC - Quit Program'#13#10 +
              ' Ctrl + R - Rescan Directory'#13#10 +
              ' Ctrl + O - Set Destination Directory to Source Directory'#13#10 +
@@ -377,6 +379,19 @@ begin
   SystemTags('c:run newcli', [NP_CLI, AsTag(True), TAG_END]);
 end;
 
+procedure TToolsMenu.StartProgEvent;
+var
+  s, Progline: string;
+begin
+  ProgLine := '';
+  if AskForName('Enter program name to start file with', Progline, False) then
+  begin
+    NonWaitMessage('Start ' + ExtractFileName(ProgLine));
+    s := IncludeTrailingPathDelimiter(SrcP.CurrentPath) + SrcP.ActiveEntry.Name;
+    SystemTags(PChar(Progline + ' ' + s), [TAG_END]);
+  end;
+end;
+
 procedure TToolsMenu.ProcessMouse(MouseEvent: TMouseEvent);
 var
   NEntry: Integer;
@@ -436,6 +451,7 @@ begin
   AddToolsEntry('Open new shell window', @ShellEvent);
   AddToolsEntry('Pack selected with lha', @LhaPackEvent);
   AddToolsEntry('Pack selected with lzx', @lzxPackEvent);
+  AddToolsEntry('Open file in external program', @StartProgEvent);
 end;
 
 function TToolsMenu.Execute: TDialogResult;
@@ -985,8 +1001,7 @@ procedure TShowMessage.DrawButtons;
 var
   i: Integer;
 begin
-  if Length(ButtonsArray) = 0 then
-    ConfigureButtons;
+  ConfigureButtons;
   FGPen := Black;
   for i := 0 to High(ButtonsArray) do
   begin
