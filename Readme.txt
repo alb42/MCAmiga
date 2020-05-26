@@ -69,6 +69,7 @@ EDITOR2=  Editor for Shift F4
 LEFT=     Startup path for left panel
 RIGHT=    Startup path for right panel
 
+WITHDEVICES=1 Show devices in the top overview also (together with assigns and volumes, careful some of them will crash on access)
 
 History:
 ########

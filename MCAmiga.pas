@@ -253,6 +253,8 @@ begin
     // Defaults                                          but with th
     LeftDefaultPath := GetStrToolType(DObj, 'LEFT', LeftDefaultPath);
     RightDefaultPath := GetStrToolType(DObj, 'RIGHT', RightDefaultPath);
+    // WithDevices
+    WithDevices := GetStrToolType(DObj, 'WITHDEVICES', '0') <> '0';
     FreeDiskObject(DObj);
   end;
   {$endif}

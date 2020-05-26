@@ -163,6 +163,9 @@ type
 
   function GetTempFileEvent(const Dir: string; const Prefix: string):string;
 
+var
+  WithDevices: Boolean = False;
+
 implementation
 
 uses
@@ -382,6 +385,26 @@ const
   DLT_DIRECTORY = DLT_LOCK;
 {$endif}
 
+const
+  IgnoredDevices: array[0..30] of string = ('USBRAW:', 'ZERO:', 'SYSCON:','SYSRAW:','PRINTER:', 'PS:', 'NULL:','MUICON:','IXPIPE:','AWNPIPE:', 'FIFO:','VNC:', 'VNR:', 'AUDIO:', 'AUX1:', 'AUX:', 'CON:', 'KCON:', 'KRAW:', 'PAR:', 'SER:', 'PIPE:', 'PRT:', 'RANDOM:', 'RAW:', 'RAW1:', 'SER:', 'SER1:', 'TCP:', 'TEXTCLIP:', 'URL:');
+
+function IsIgnored(ADevName: string): Boolean;
+var
+  i: Integer;
+begin
+  ADevName := UpperCase(ADevName);
+  Result := False;
+  for i := 0 to High(IgnoredDevices) do
+  begin
+    if ADevName = IgnoredDevices[i] then
+    begin
+      Result := True;
+      Exit;
+    end;
+  end;
+end;
+
+
 procedure TFileList.DrawContents(UpdateList: Boolean);
 var
   Info: TSearchRec;
@@ -394,6 +417,7 @@ var
   CDir: TArchiveDir;
   AE: TArchiveEntry;
   {$endif}
+  ListToGet: LongWord;
 begin
   FGPen := LightGray;
   BGPen := Blue;
@@ -403,10 +427,13 @@ begin
     FFileList.Clear;
     if FCurrentPath = '' then
     begin
+      ListToGet := LDF_VOLUMES or LDF_ASSIGNS or LDF_READ;
+      if WithDevices then
+        ListToGet := ListToGet or LDF_DEVICES;
       {$ifdef HASAMIGA}
-      dl := LockDosList(LDF_VOLUMES or LDF_ASSIGNS or LDF_READ);
+      dl := LockDosList(ListToGet);
       //
-      dl := NextDosEntry(dl, LDF_VOLUMES or LDF_ASSIGNS);
+      dl := NextDosEntry(dl, ListToGet);
       while Assigned(dl) do
       begin
         NEntry := TListEntry.Create;
@@ -415,14 +442,21 @@ begin
         {$else}
         NEntry.Name := string(PChar(BADDR(dl^.dol_Name)) + 1) + ':';
         {$endif}
-        if (dl^.dol_Type and DLT_DIRECTORY) <> 0 then
-          NEntry.EType := etAssign
+        if WithDevices and IsIgnored(NEntry.Name) then
+        begin
+          NEntry.free;
+        end
         else
-          NEntry.EType := etDrive;
-        FFileList.Add(NEntry);
-        dl := NextDosEntry(dl, LDF_VOLUMES or LDF_ASSIGNS);
+        begin
+          if (dl^.dol_Type and DLT_DIRECTORY) <> 0 then
+            NEntry.EType := etAssign
+          else
+            NEntry.EType := etDrive;
+          FFileList.Add(NEntry);
+        end;
+        dl := NextDosEntry(dl, ListToGet);
       end;
-      UnlockDosList(LDF_VOLUMES or LDF_ASSIGNS or LDF_READ);
+      UnlockDosList(ListToGet);
       {$endif}
     end
     else
