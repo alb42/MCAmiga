@@ -73,12 +73,12 @@ begin
     $0F09: SwapSrcDest;                                        // TAB -> change Focus to other window
     $0008: Src.GoToParent;                                     // Backspace -> Parent
     $1C0D, $000D: Src.EnterPressed(st and kbShift <> 0);      // return -> Enter Dir/Assign/Drive
-    kbdUp, $38: Src.ActiveElement := Src.ActiveElement - 1;    // cursor up -> Move around
-    kbdDown, $32: Src.ActiveElement := Src.ActiveElement + 1;  // cursor down -> Move around
-    kbdPgUp, $39: Src.ActiveElement := Src.ActiveElement - 10; // pg up -> Move around
-    kbdPgDn, $33: Src.ActiveElement := Src.ActiveElement + 10; // pg down -> Move around
-    kbdHome, $37: Src.ActiveElement := 0;                      // Home -> Move around
-    kbdEnd, $31: Src.ActiveElement := MaxInt;                  // end -> Move around
+    kbdUp, $38: begin if (st and kbShift) <> 0 then Src.SelectActiveEntry(False); Src.ActiveElement := Src.ActiveElement - 1; end;   // cursor up -> Move around
+    kbdDown, $32: if (st and kbShift) <> 0 then Src.SelectActiveEntry else Src.ActiveElement := Src.ActiveElement + 1;  // cursor down -> Move around
+    kbdPgUp, $39, $8D00: Src.ActiveElement := Src.ActiveElement - 10; // pg up -> Move around
+    kbdPgDn, $33, $9100: Src.ActiveElement := Src.ActiveElement + 10; // pg down -> Move around
+    kbdHome, $37, $7300: Src.ActiveElement := 0;                      // Home -> Move around
+    kbdEnd, $31, $7400: Src.ActiveElement := MaxInt;                  // end -> Move around
     $1312, $1300: Src.Update(True);                    // Ctrl + R Alt + R -> Reload
     $180F, $1800: Dest.CurrentPath := Src.CurrentPath; // Ctrl + O Alt + O -> copy path to dest
     $2004, $2000: Src.CurrentPath := '';               // Ctrl + D Alt + D -> back to drives/Assign
@@ -149,8 +149,8 @@ begin
         Right.Update(False);
       end;
     end
-    //else
-    //  if (ev and $FFFF) <> 0 then writeln('Key: $' + HexStr(TranslateKeyEvent(Ev), 4));
+    else
+      if (ev and $FFFF) <> 0 then writeln('Key: $' + HexStr(TranslateKeyEvent(Ev), 4));
   end;
 end;
 

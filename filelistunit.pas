@@ -17,7 +17,7 @@ type
 const
   AmigaExecMagic = $03F3;
 
-  ArchiveCmd: array[TArchiveType] of string = ('c:lha -r - x1', 'c:lzx -r -x1');
+  ArchiveCmd: array[TArchiveType] of string = ('c:lha -r -x1', 'c:lzx -r -x1');
   ArchiveName: array[TArchiveType] of string = ('LHA', 'LZX');
   ArchiveExt: array[TArchiveType] of string = ('.lha', '.lzx');
 
@@ -132,7 +132,7 @@ type
     procedure Rename;         // Shift F6
 
     procedure ActivateFile(AName: string);
-    procedure SelectActiveEntry;
+    procedure SelectActiveEntry(GoToNextEntry: Boolean = True);
 
     procedure ScanSize;
 
@@ -923,6 +923,7 @@ var
   Magic: LongWord;
   Ret: LongInt;
   ToChange: TFileList;
+  cmd: string;
 begin
   if WithShiftPressed then
     ToChange := OtherSide
@@ -943,11 +944,10 @@ begin
       end;
       etParent: GoToParent;
       etFile: begin
-        if CheckForArchiveEnter(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name) then
+        if ToChange.CheckForArchiveEnter(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name) then
         begin
-          //FArchiveName := IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name;
-          FCurrentPath := FArchive.ArchiveName + #10;
-          Self.Update(True);
+          ToChange.FCurrentPath := ToChange.FArchive.ArchiveName + #10;
+          ToChange.Update(True);
           Exit;
         end;
         try
@@ -963,9 +963,14 @@ begin
             if AskForName('Parameter:', Params, False) then
             begin
               NonWaitMessage('Starting ' + FFileList[FActiveElement].Name);
-              Ret := ExecuteProcess(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name, [Params]);
+              cmd := IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name + ' ' + Params;
+              if WithShiftPressed then
+                cmd := 'c:run ' + cmd;
+              Ret := SystemTags(PChar(cmd), [TAG_END]);
               if Ret <> 0 then
                 ShowMessage(FFileList[FActiveElement].Name + ' returned with error message: ' + IntToStr(Ret));
+              if WithShiftPressed then
+                Sleep(250);
             end;
             except
               ;
@@ -1431,14 +1436,15 @@ begin
   end;
 end;
 
-procedure TFileList.SelectActiveEntry;
+procedure TFileList.SelectActiveEntry(GoToNextEntry: Boolean = True);
 begin
   if InRange(FActiveElement, 0, FFileList.Count - 1) then
   begin
     if FFileList[FActiveElement].EType in [etDir, etFile] then
       FFileList[FActiveElement].Selected := not FFileList[FActiveElement].Selected;
     DrawEntry(FActiveElement);
-    ActiveElement := FActiveElement + 1;
+    if GoToNextEntry then
+      ActiveElement := FActiveElement + 1;
     CheckSelected;
   end;
 end;
