@@ -149,8 +149,10 @@ begin
         Right.Update(False);
       end;
     end
+    {$ifndef RELEASE}
     else
       if (ev and $FFFF) <> 0 then writeln('Key: $' + HexStr(TranslateKeyEvent(Ev), 4));
+    {$endif}
   end;
 end;
 

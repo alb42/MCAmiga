@@ -37,6 +37,8 @@ type
 
   TShowMessage = class(TBaseDialog)
   protected
+    WithScroll: Boolean;
+    TopLine: LongInt;
     SelectedButton: Integer;
     ButtonsArray: array of record
       Rect: TRect;
@@ -200,6 +202,9 @@ const
   ProgressEmpty = #176;
   //ProgressHalf = #221;
   ProgressFull = #219;
+
+  ArrowUp = #24;
+  ArrowDown = #25;
 
 
 
@@ -849,12 +854,20 @@ function TAskForName.Execute: TDialogResult;
 var
   Key: TKeyEvent;
   c: Char;
-  p: LongInt;
+  p, i: LongInt;
   OldName: String;
 begin
   Paint;
   repeat
     Key := PollNextKey;
+    for i := 0 to High(ButtonsArray) do
+    begin
+      if ButtonsArray[i].Pressed then
+      begin
+        Result := ButtonsArray[i].Result;
+        Exit;
+      end;
+    end;
     case (Key and $FFFF) of
       $4B00: begin // cursor left
         if CursorX > TxtL then
@@ -1027,10 +1040,11 @@ end;
 
 procedure TShowMessage.Paint;
 var
-  i: Integer;
+  i, j: Integer;
   SL: TStringList;
   MaxX, MaxY: Integer;
   s,s1: string;
+  DrawUp, DrawDown: Boolean;
 begin
   inherited;
   //
@@ -1061,20 +1075,38 @@ begin
   MaxX := MaxX + 4;
   MaxY := SL.Count + 4;
 
-  WindowRect.Left := Mid.X - MaxX div 2;
-  WindowRect.Top := Mid.Y - MaxY div 2;
-  WindowRect.Right :=  Mid.X + MaxX div 2;
-  WindowRect.Bottom := Mid.Y + MaxY div 2;
+  WindowRect.Left := Max(1, Mid.X - MaxX div 2);
+  WindowRect.Top := Max(1, Mid.Y - MaxY div 2);
+  WindowRect.Right :=  Min(ScreenWidth - 2, Mid.X + MaxX div 2);
+  WindowRect.Bottom := Min(ScreenHeight - 2 ,Mid.Y + MaxY div 2);
 
   BGPen := LightGray;
   FGPen := Black;
 
   DrawWindowBorder;
 
-
-  for i := 0 to SL.Count - 1 do
-    SetText(InnerRect.left + 1, InnerRect.Top + 1 + i, SL[i]);
+  j := 0;
+  WithScroll := SL.Count > InnerRect.Height - 1;
+  if WithScroll then
+  begin
+    TopLine := EnsureRange(TopLine, 0, SL.Count - (InnerRect.Height - 1));
+  end
+  else
+    TopLine := 0;
+  DrawUp := TopLine > 0;
+  DrawDown := WithScroll and (TopLine < SL.Count - (InnerRect.Height - 1));
+  for i := TopLine to SL.Count - 1 do
+  begin
+    if InnerRect.Top + 1 + j < ScreenHeight - 3 then
+      SetText(InnerRect.left + 1, InnerRect.Top + 1 + j, SL[i]);
+    j := j + 1;
+  end;
   SL.Free;
+
+  if DrawUp then
+    SetChar(InnerRect.Right, InnerRect.Top, ArrowUp);
+  if DrawDown then
+    SetChar(InnerRect.Right, InnerRect.Bottom, ArrowDown);
 
   // draw Buttons
   DrawButtons;
@@ -1109,6 +1141,8 @@ var
   Key: TKeyEvent;
   i: Integer;
 begin
+  WithScroll := False;
+  TopLine := 0;
   SelectedButton := 0;
   Result := mrOK;
   Paint;
@@ -1122,7 +1156,7 @@ begin
         Exit;
       end;
     end;
-    case (Key and $FFFF) of
+    case (TranslateKeyEvent(Key) and $FFFF) of
       $1C0D, $000D: begin
         Result := ButtonsArray[SelectedButton].Result;
         Break;
@@ -1131,13 +1165,21 @@ begin
         SelectedButton := (SelectedButton + 1) mod Length(ButtonsArray);
         DrawButtons;
       end;
-      $4B00, $34: begin    // cursor left
+      kbdLeft, $34: begin    // cursor left
         SelectedButton := Max(SelectedButton - 1, 0);
         DrawButtons;
       end;
-      $4D00, $36: begin    // cursor right
+      kbdRight, $36: begin    // cursor right
         SelectedButton := Min(SelectedButton + 1, High(ButtonsArray));
         DrawButtons;
+      end;
+      kbdUp, $38: begin // cursor up
+        TopLine := Max(0, TopLine - 1);
+        Paint;
+      end;
+      kbdDown, $32: begin // cursor down
+        TopLine := TopLine + 1;
+        Paint;
       end;
       $011B: begin
         Result := mrCancel;

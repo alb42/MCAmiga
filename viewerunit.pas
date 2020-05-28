@@ -163,7 +163,7 @@ begin
   LastSpace := -1;
   for i := 0 to BufferSize - 1 do
   begin
-    if p[i] in [20, 9] then
+    if p[i] in [$20, 9] then
       LastSpace := i;
     if p[i] = 10 then
     begin
@@ -173,12 +173,12 @@ begin
         LineStart := i + 1;
       end;
     end;
-    if (i - LineStart >= ScreenWidth) then
+    if (i - LineStart >= ScreenWidth - 1) then
     begin
       if LastSpace > 0 then
       begin
-        LineStarts.Add(@(p[LastSpace]));
-        LineStart := LastSpace;
+        LineStarts.Add(@(p[LastSpace + 1]));
+        LineStart := LastSpace + 1;
         LastSpace := -1
       end
       else
@@ -445,11 +445,13 @@ begin
   else
     EndPC := LineStarts[Line + 1];
   FillChar(MemLine^, MemLineLength, 0);
-  Move(StartPC^, MemLine^, Min(MemLineLength, EndPC - StartPC - 1));
-  for i := 0 to Min(MemLineLength, EndPC - StartPC - 1) - 1 do
+  Move(StartPC^, MemLine^, Min(MemLineLength, EndPC - StartPC));
+  for i := 0 to Min(MemLineLength, EndPC - StartPC - 1) do
   begin
     if MemLine[i] = #0 then
       MemLine[i] := '.';
+    if MemLine[i] = #10 then
+      MemLine[i] := ' ';
   end;
   Result := MemLine;
 end;
