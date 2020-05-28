@@ -1586,26 +1586,31 @@ begin
   begin
     if FFileList[FActiveElement].EType = etFile then
     begin
-      if InArchive then
-      begin
-        TempName := GetTempFileName('t:','mcfile');
-        BasePath := IncludeTrailingPathDelimiter(Copy(FCurrentPath, Pos(#10, FCurrentPath) + 2, Length(FCurrentPath)));
-        FArchive.ExtractFile(BasePath + FFileList[FActiveElement].Name, TempName);
-        FileN := TempName;
-      end
-      else
-        FileN := IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name;
-      if OpenWithProgram = '' then
-        FileViewer(FileN)
-      else
-      begin
-        NonWaitMessage('Starting ' + ExtractFileName(OpenWithProgram));
-        Ret := ExecuteProcess(OpenWithProgram, [FileN]);
-        if Ret <> 0 then
-          ShowMessage(OpenWithProgram + ' returned with error message: ' + IntToStr(Ret));
+      try
+        if InArchive then
+        begin
+          TempName := GetTempFileName('t:','mcfile');
+          BasePath := IncludeTrailingPathDelimiter(Copy(FCurrentPath, Pos(#10, FCurrentPath) + 2, Length(FCurrentPath)));
+          FArchive.ExtractFile(BasePath + FFileList[FActiveElement].Name, TempName);
+          FileN := TempName;
+        end
+        else
+          FileN := IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name;
+        if OpenWithProgram = '' then
+          FileViewer(FileN)
+        else
+        begin
+          NonWaitMessage('Starting ' + ExtractFileName(OpenWithProgram));
+          Ret := ExecuteProcess(OpenWithProgram, [FileN]);
+          if Ret <> 0 then
+            ShowMessage(OpenWithProgram + ' returned with error message: ' + IntToStr(Ret));
+        end;
+        if InArchive then
+          DeleteFile(TempName);
+      except
+        on e: Exception do
+          ShowMessage('Exception starting ' + ExtractFileName(OpenWithProgram) + ':'#13#10 + E.Message);
       end;
-      if InArchive then
-        DeleteFile(TempName);
       Update(False);
       OtherSide.Update(False);
     end;
@@ -1622,30 +1627,35 @@ begin
   begin
     if FFileList[FActiveElement].EType = etFile then
     begin
-      if InArchive then
-      begin
-        TempName := GetTempFileName('t:','mcfile');
-        BasePath := IncludeTrailingPathDelimiter(Copy(FCurrentPath, Pos(#10, FCurrentPath) + 2, Length(FCurrentPath)));
-        FArchive.ExtractFile(BasePath + FFileList[FActiveElement].Name, TempName);
-        FileN := TempName;
-      end
-      else
-        FileN := IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name;
-      if OpenWithProgram = '' then
-        ShowMessage('No Editor set')
-      else
-      begin
-        // message without waiting
-        NonWaitMessage('Starting ' + ExtractFileName(OpenWithProgram));
-        Ret := ExecuteProcess(OpenWithProgram, [FileN]);
-        if Ret <> 0 then
+      try
+        if InArchive then
         begin
-          ShowMessage(OpenWithProgram + ' returned with error message: ' + IntToStr(Ret));
+          TempName := GetTempFileName('t:','mcfile');
+          BasePath := IncludeTrailingPathDelimiter(Copy(FCurrentPath, Pos(#10, FCurrentPath) + 2, Length(FCurrentPath)));
+          FArchive.ExtractFile(BasePath + FFileList[FActiveElement].Name, TempName);
+          FileN := TempName;
         end
         else
+          FileN := IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name;
+        if OpenWithProgram = '' then
+          ShowMessage('No Editor set')
+        else
         begin
-          FArchive.PackFile(TempName, BasePath + FFileList[FActiveElement].Name);
+          // message without waiting
+          NonWaitMessage('Starting ' + ExtractFileName(OpenWithProgram));
+          Ret := ExecuteProcess(OpenWithProgram, [FileN]);
+          if Ret <> 0 then
+          begin
+            ShowMessage(OpenWithProgram + ' returned with error message: ' + IntToStr(Ret));
+          end
+          else
+          begin
+            FArchive.PackFile(TempName, BasePath + FFileList[FActiveElement].Name);
+          end;
         end;
+      except
+        on e: Exception do
+          ShowMessage('Exception starting ' + ExtractFileName(OpenWithProgram) + ':'#13#10 + E.Message);
       end;
       if InArchive then
         DeleteAll(TempName);

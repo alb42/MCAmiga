@@ -1063,7 +1063,7 @@ begin
       Delete(s, 1, ScreenWidth - 6);
       if Length(SL[i]) > MaxX then
         MaxX := Length(SL[i]);
-      SL.Insert(i + 1, s1);
+      SL.Insert(i + 1, s);
     end
     else
     begin
