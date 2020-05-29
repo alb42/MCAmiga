@@ -42,11 +42,11 @@ Tab                  - change focus to other panel
 Enter                - Enter Directory if cursor on directory or archive
 Shift-Enter          - Open directory or archive on other panel
 Backspace            - go to Parent
-Strg F1, Alt F1      - go to drives view on left panel
-Strg F2, Alt F2      - go to drives view on right panel
-Ctrl D, Alt D        - go to drives view
-Alt O                - set destination dir to source dir
-Ctrl S               - type start of name to fast jump to it
+Strg + F1, Alt + F1  - go to drives view on left panel
+Strg + F2, Alt + F2  - go to drives view on right panel
+Ctrl + D, Alt + D    - go to drives view
+Alt + O              - set destination dir to source dir
+Ctrl + S             - type start of name to fast jump to it
 
 Selection:
 ----------
@@ -75,6 +75,7 @@ F1       - Help
 F2       - Tools menu
 F10, ESC - Quit
 Ctrl + R - Rescan current directory
+Ctrl + M - Toggle visibility of bottom menu
 Shift + Space - Scan Directory size
 
 Tooltypes:
@@ -89,6 +90,8 @@ LEFT=     Startup path for left panel
 RIGHT=    Startup path for right panel
 
 WITHDEVICES=1 Show devices in the top overview also (together with assigns and volumes, careful some of them will crash on access)
+
+SHOWMENU  if this ToolType is present the Bottom menu is shown by program start
 
 History:
 ########

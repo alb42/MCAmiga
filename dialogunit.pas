@@ -223,6 +223,7 @@ const       //.........1.........2.........3.........4.........5........6.......
              ' Ctrl + R - Rescan Directory'#13#10 +
              ' Ctrl + O - Set Destination Directory to Source Directory'#13#10 +
              ' Ctrl + S - type to find entry in current directory'#13#10 +
+             ' Ctrl + M - Toggle bottom menu'#13#10 +
              '';
 
   const       //.........1.........2.........3.........4.........5........6.........7

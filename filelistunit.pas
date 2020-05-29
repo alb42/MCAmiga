@@ -169,6 +169,7 @@ type
 
 var
   WithDevices: Boolean = False;
+  DefShowMenu: Boolean = False;
 
 implementation
 
@@ -894,7 +895,7 @@ end;
 constructor TFileList.Create(ARect: TRect);
 begin
   inherited Create;
-  FShowMenu := True;
+  FShowMenu := DefShowMenu;
   FArchive := nil;
   //
   FMouseSelMode := msNone;

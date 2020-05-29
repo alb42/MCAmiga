@@ -309,6 +309,9 @@ begin
     RightDefaultPath := GetStrToolType(DObj, 'RIGHT', RightDefaultPath);
     // WithDevices
     WithDevices := GetStrToolType(DObj, 'WITHDEVICES', '0') <> '0';
+    //
+    DefShowMenu := GetStrToolType(DObj, 'SHOWMENU', '0') = '';
+    writeln('Showmenu ', DefShowMenu);
     FreeDiskObject(DObj);
   end;
   {$endif}
