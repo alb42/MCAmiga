@@ -76,16 +76,25 @@ begin
           Right.Update(False);
         end;
         2:begin //F3
-          Src.ViewFile(ViewerLink);
+          if me.buttons = MouseLeftButton then
+            Src.ViewFile(ViewerLink);
+          if me.buttons = MouseRightButton then
+            Src.ViewFile(AltViewerLink);
         end;
         3:begin //F4
-          Src.EditFile(EditLink);
+          if me.buttons = MouseLeftButton then
+            Src.EditFile(EditLink);
+          if me.buttons = MouseRightButton then
+            Src.EditFile(AltEditLink);
         end;
         4:begin //F5
           Src.CopyFiles;
         end;
         5:begin //F6
-          Src.MoveFiles;
+          if me.buttons = MouseLeftButton then
+            Src.MoveFiles;
+          if me.buttons = MouseRightButton then
+            Src.Rename();
         end;
         6:begin //F7
           Src.MakeDir();
@@ -309,9 +318,9 @@ begin
     RightDefaultPath := GetStrToolType(DObj, 'RIGHT', RightDefaultPath);
     // WithDevices
     WithDevices := GetStrToolType(DObj, 'WITHDEVICES', '0') <> '0';
-    //
+    // ShowMenu
     DefShowMenu := GetStrToolType(DObj, 'SHOWMENU', '0') = '';
-    writeln('Showmenu ', DefShowMenu);
+    //
     FreeDiskObject(DObj);
   end;
   {$endif}
