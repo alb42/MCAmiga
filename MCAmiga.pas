@@ -2,7 +2,7 @@ program MCAmiga;
 {$mode objfpc}{$H+}
 uses
   {$ifdef HASAMIGA}
-  Exec, workbench, icon, AppWindowUnit,
+  Exec, workbench, icon, AppWindowUnit, Intuition,
   {$endif}
   {$ifdef RELEASE}
   Versioncheck,
@@ -25,7 +25,7 @@ var
 
   LeftDefaultPath: string = '';
   RightDefaultPath: string = '';
-
+  FullScreen: Boolean = FALSE;
 
 
 procedure SwapSrcDest;
@@ -319,6 +319,8 @@ begin
     WithDevices := GetStrToolType(DObj, 'WITHDEVICES', '0') <> '0';
     // ShowMenu
     DefShowMenu := GetStrToolType(DObj, 'SHOWMENU', '0') = '';
+    // Own Screen
+    FullScreen := GetStrToolType(DObj, 'FULLSCREEN', '0') = '';
     //
     FreeDiskObject(DObj);
   end;
@@ -328,6 +330,8 @@ end;
 procedure StartMe;
 var
   Mode: TVideoMode;
+  VideoFontHeight, x,y: LongInt;
+
 begin
   LockScreenUpdate;
   {$ifdef HASAMIGA}
@@ -348,6 +352,12 @@ begin
   OnDropItem := @DropEvent;
   {$endif}
 
+  Mode.Col := 0;
+  Video.GetVideoMode(Mode);
+  if FullScreen then
+    Mode.color := False;
+  Video.SetVideoMode(Mode);
+  //
   Left := TFileList.Create(Rect(0, 0, (ScreenWidth div 2) - 1, ScreenHeight - 1));
   Right := TFileList.Create(Rect((ScreenWidth div 2), 0, ScreenWidth - 1, ScreenHeight - 1));
   Left.OtherSide := Right;
@@ -356,12 +366,20 @@ begin
   Src := Left;
   Dest := Right;
 
-  Mode.Col := 0;
-  Video.GetVideoMode(Mode);
-  Video.SetVideoMode(Mode);
-
   Left.CurrentPath := LeftDefaultPath;
   Right.CurrentPath := RightDefaultPath;
+
+  if FullScreen then
+  begin
+    x := 1;
+    y := 1;
+    VideoFontHeight := 16;
+    TranslateToCharXY(100, 100, x,y);
+    if y > 0 then
+      VideoFontHeight := 100 div y;
+    ResizeEvent(VideoWindow^.GZZWidth div 8, VideoWindow^.GZZHeight div VideoFontHeight);
+    ActivateWindow(VideoWindow);
+  end;
 
   UnlockScreenUpdate;
   UpdateScreen(True);
