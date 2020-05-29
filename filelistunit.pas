@@ -81,6 +81,7 @@ type
   private
     function GetInArchive: Boolean;
   private
+    FShowMenu: Boolean;
     FArchive: TArchiveBase;
 
     FOtherSide: TFileList;
@@ -98,6 +99,7 @@ type
     procedure SetActiveElement(AValue: Integer);
     procedure SetCurrentPath(AValue: string);
     procedure DrawBorder;
+    procedure DrawMenu;
     procedure DrawContents(UpdateList: Boolean);
     procedure SetIsActive(AValue: Boolean);
     procedure DrawActive(NActive: Integer);
@@ -107,6 +109,7 @@ type
     procedure PackSelectedFiles(AsMove: Boolean);
 
     procedure DoListOfSelectedFile(Recursive: Boolean; FL: TEntryList; out Dirs: integer; out Files: Integer; out Size: Int64);
+    procedure SetShowMenu(AValue: Boolean);
 
     procedure SortList;
     procedure CheckSelected;
@@ -152,6 +155,7 @@ type
     property ActiveEntry: TListEntry read GetActiveEntry;
     property PanelRect: TRect read FRect;
     property OtherSide: TFileList read FOtherSide write FOtherSide;
+    property ShowMenu: Boolean read FShowMenu write SetShowMenu;
   end;
 
 
@@ -378,6 +382,40 @@ begin
   else
     SetText(FRect.Left + 2, FRect.Top, LeftEdge + s + RightEdge);
   CheckSelected;
+  if FShowMenu and IsActive then
+    DrawMenu;
+end;
+
+const
+  MenuNames: array[1..10] of string = ('Help', 'Tools', 'View', 'Edit', 'Copy', 'Move', 'MkDir', 'Delete', ' ', 'Quit');
+
+procedure TFileList.DrawMenu;
+var
+  Len, x, y, i: LongInt;
+  s: string;
+begin
+  Len := ScreenWidth div 10;
+  BGPen := Cyan;
+  FGPen := Black;
+  for i := 0 to ScreenWidth - 1 do
+  begin
+    SetChar(i, FRect.Bottom + 1, ' ');
+  end;
+
+  for i := 1 to 10 do
+  begin
+    x := (i - 1) * Len;
+    y := FRect.Bottom + 1;
+    s := Format('%2d', [i]);
+    FGPen := White;
+    BGPen := Black;
+    SetText(x,y, s);
+    x := x + 2;
+    s := Copy(MenuNames[i], 1, Len - 2);
+    BGPen := Cyan;
+    FGPen := Black;
+    SetText(x,y, s);
+  end;
 end;
 
 {$ifdef AmigaOS4}
@@ -856,6 +894,7 @@ end;
 constructor TFileList.Create(ARect: TRect);
 begin
   inherited Create;
+  FShowMenu := True;
   FArchive := nil;
   //
   FMouseSelMode := msNone;
@@ -863,6 +902,8 @@ begin
   FTopElement := -1;
   FBottomElement := -1;
   FRect := ARect;
+  if FShowMenu then
+    FRect.Height := Frect.Height - 1;
   FInnerRect := FRect;
   FInnerRect.Inflate(-1, -1);
   FInnerRect.Height := FInnerRect.Height - 2;
@@ -878,6 +919,8 @@ end;
 procedure TFileList.Resize(ARect: TRect);
 begin
   FRect := ARect;
+  if FShowMenu then
+    FRect.Height := Frect.Height - 1;
   FInnerRect := FRect;
   FInnerRect.Inflate(-1, -1);
   FInnerRect.Height := FInnerRect.Height - 2;
@@ -1290,6 +1333,11 @@ begin
   end;
   CountPG.Free;
   CountPG := nil;
+end;
+
+procedure TFileList.SetShowMenu(AValue: Boolean);
+begin
+  FShowMenu := AValue;
 end;
 
 //############ Delete

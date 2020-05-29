@@ -865,6 +865,7 @@ begin
       if ButtonsArray[i].Pressed then
       begin
         Result := ButtonsArray[i].Result;
+        SetCursorType(crHidden);
         Exit;
       end;
     end;

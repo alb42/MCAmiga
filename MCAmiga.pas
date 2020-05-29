@@ -42,6 +42,7 @@ end;
 procedure MouseEvent(Me: TMouseEvent);
 var
   P: TPoint;
+  Len: LongInt;
 begin
   if me.Action = MouseActionDown then
   begin
@@ -51,14 +52,58 @@ begin
       if Right.IsActive then
         SwapSrcDest;
       Left.MouseEvent(Me);
-    end
-    else
-      if Right.PanelRect.Contains(P) then
-      begin
-        if Left.IsActive then
-          SwapSrcDest;
-        Right.MouseEvent(Me);
+      Exit;
+    end;
+    if Right.PanelRect.Contains(P) then
+    begin
+      if Left.IsActive then
+        SwapSrcDest;
+      Right.MouseEvent(Me);
+      Exit;
+    end;
+    if (Me.y = ScreenHeight - 1) and Src.ShowMenu then
+    begin
+      Len := ScreenWidth div 10;
+      case Me.x div Len of
+        0:begin //F1
+            ShowHelp;
+            Left.Update(False);
+            Right.Update(False);
+          end;
+        1:begin // F2
+          ShowTools(Src, Dest);
+          Left.Update(False);
+          Right.Update(False);
+        end;
+        2:begin //F3
+          Src.ViewFile(ViewerLink);
+        end;
+        3:begin //F4
+          Src.EditFile(EditLink);
+        end;
+        4:begin //F5
+          Src.CopyFiles;
+        end;
+        5:begin //F6
+          Src.MoveFiles;
+        end;
+        6:begin //F7
+          Src.MakeDir();
+        end;
+        7:begin //F8
+          Src.DeleteSelected();
+        end;
+        9: begin // F10
+          if AskQuestion('Quit Program') then
+          begin
+            Terminate;
+            Exit;
+          end;
+          Left.Update(False);
+          Right.Update(False);
+        end;
       end;
+    end;
   end
   else
     Src.MouseEvent(Me);
@@ -83,6 +128,13 @@ begin
     $180F, $1800: Dest.CurrentPath := Src.CurrentPath; // Ctrl + O Alt + O -> copy path to dest
     $2004, $2000: Src.CurrentPath := '';               // Ctrl + D Alt + D -> back to drives/Assign
     $1F13: Src.SearchList;                             // Crtl + s  -> jump mode
+    $320D: begin
+      Src.ShowMenu := not Src.ShowMenu;
+      Dest.ShowMenu := Src.ShowMenu;
+      ClearScreen;
+      Left.Resize(Rect(0, 0, (ScreenWidth div 2) - 1, ScreenHeight - 1));
+      Right.Resize(Rect((ScreenWidth div 2), 0, ScreenWidth - 1, ScreenHeight - 1));
+    end;
     kbdInsert, $23, $30, $20: begin
       if ((st and kbShift) <> 0) and (TranslateKeyEvent(Ev) and $ffff = $20) then
       begin
