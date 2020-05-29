@@ -61,7 +61,7 @@ begin
       Right.MouseEvent(Me);
       Exit;
     end;
-    if (Me.y = ScreenHeight - 1) and Src.ShowMenu then
+    if (Me.y = ScreenHeight - 1) and DefShowMenu then
     begin
       Len := ScreenWidth div 10;
       case Me.x div Len of
@@ -137,9 +137,8 @@ begin
     $180F, $1800: Dest.CurrentPath := Src.CurrentPath; // Ctrl + O Alt + O -> copy path to dest
     $2004, $2000: Src.CurrentPath := '';               // Ctrl + D Alt + D -> back to drives/Assign
     $1F13: Src.SearchList;                             // Crtl + s  -> jump mode
-    $320D: begin
-      Src.ShowMenu := not Src.ShowMenu;
-      Dest.ShowMenu := Src.ShowMenu;
+    $320D: begin                                       // Ctrl + m -> toggle visibility of bottom menu
+      DefShowMenu := not DefShowMenu;
       ClearScreen;
       Left.Resize(Rect(0, 0, (ScreenWidth div 2) - 1, ScreenHeight - 1));
       Right.Resize(Rect((ScreenWidth div 2), 0, ScreenWidth - 1, ScreenHeight - 1));
