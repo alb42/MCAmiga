@@ -12,13 +12,6 @@ cp LICENSE.info Release/MCAmiga
 cp Readme.txt Release/MCAmiga
 cp Readme.txt.info Release/MCAmiga
 
-rm -f MCAmiga
-# amiga
-fpc4amiga.sh -B -dRELEASE -FUlib MCAmiga.pas
-mkdir Release/MCAmiga/m68k-amiga
-cp Release/MCAmiga.info Release/MCAmiga/m68k-amiga.info
-cp MCAmiga Release/MCAmiga/m68k-amiga
-cp MCAmiga.info Release/MCAmiga/m68k-amiga
 
 rm -f MCAmiga
 # AROS
@@ -60,6 +53,23 @@ cp Release/MCAmiga.info Release/MCAmiga/powerpc-amiga.info
 cp MCAmiga Release/MCAmiga/powerpc-amiga
 cp MCAmiga.info Release/MCAmiga/powerpc-amiga/MCAmiga.info
 
+rm -f MCAmiga
+# amiga000
+fpc4amiga000.sh -B -dRELEASE -FUlib MCAmiga.pas
+mkdir Release/MCAmiga/m68000-amiga
+cp Release/MCAmiga.info Release/MCAmiga/m68000-amiga.info
+cp MCAmiga Release/MCAmiga/m68000-amiga
+cp MCAmiga.info Release/MCAmiga/m68000-amiga
+
+rm -f MCAmiga
+# amiga
+fpc4amiga.sh -B -dRELEASE -FUlib MCAmiga.pas
+mkdir Release/MCAmiga/m68020-amiga
+cp Release/MCAmiga.info Release/MCAmiga/m68020-amiga.info
+cp MCAmiga Release/MCAmiga/m68020-amiga
+cp MCAmiga.info Release/MCAmiga/m68020-amiga
+
+
 cd Release
-lha co50 MCAmigaV02.lha MCAmiga MCAmiga.info
+lha co50 MCAmigaVxx.lha MCAmiga MCAmiga.info
 cd ..
