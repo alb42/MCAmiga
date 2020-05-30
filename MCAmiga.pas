@@ -1,9 +1,7 @@
 program MCAmiga;
 {$mode objfpc}{$H+}
 uses
-  {$ifdef HASAMIGA}
   workbench, icon, AppWindowUnit, Intuition,
-  {$endif}
   {$ifdef RELEASE}
   Versioncheck,
   {$endif}
@@ -260,7 +258,6 @@ begin
   end;
 end;
 
-{$ifdef HASAMIGA}
 function GetStrToolType(DObj: PDiskObject; Entry: string; Default: string): string;
 var
   Res: PChar;
@@ -292,16 +289,12 @@ begin
     Result := Res;
   {$endif}
 end;
-{$endif}
 
 
 procedure GetSettings;
-{$ifdef HASAMIGA}
 var
   DObj: PDiskObject;
-{$endif}
 begin
-  {$ifdef HASAMIGA}
   DObj := GetDiskObject(PChar(ParamStr(0)));
   if Assigned(DObj) then
   begin
@@ -323,7 +316,6 @@ begin
     //
     FreeDiskObject(DObj);
   end;
-  {$endif}
 end;
 
 procedure StartMe;
@@ -333,23 +325,15 @@ var
 
 begin
   LockScreenUpdate;
-  {$ifdef HASAMIGA}
   LeftDefaultPath := 'sys:';
   RightDefaultPath := 'ram:';
-  {$endif}
-  {$ifdef LINUX}
-  LeftDefaultPath := '/';
-  RightDefaultPath := '/usr/bin';
-  {$endif}
   GetSettings;
 
   OnKeyPress := @KeyEvent;
   OnMouseEvent := @MouseEvent;
   OnResize := @ResizeEvent;
   OnIdle := @IdleEvent;
-  {$ifdef HASAMIGA}
   OnDropItem := @DropEvent;
-  {$endif}
 
   Mode.Col := 0;
   Video.GetVideoMode(Mode);
@@ -389,13 +373,11 @@ begin
   {$ifdef RELEASE}
   CreateVersion;
   {$endif}
-  {$ifdef HASAMIGA}
+
   MakeAppWindow;
-  {$endif}
   RunApp;
-  {$ifdef HASAMIGA}
   DestroyAppWindow;
-  {$endif}
+
   Left.Free;
   Right.Free;
 end;
@@ -407,9 +389,8 @@ begin
   InitVideo;
   InitMouse;
   InitKeyboard;
-  {$ifdef HASAMIGA}
+
   Video.SetWindowTitle('MyCommander Amiga ' + NumVERSION, Copy(VERSION, 6, 12));
-  {$endif}
 
   StartMe;
 

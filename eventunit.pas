@@ -5,9 +5,7 @@ unit EventUnit;
 interface
 
 uses
-  {$ifdef HASAMIGA}
   AppWindowUnit,
-  {$endif}
   Classes, SysUtils, Video, Keyboard, Mouse;
 
 type
@@ -54,7 +52,6 @@ begin
   if PollKeyEvent <> 0 then
     Result := GetKeyEvent;
   // check for Resize Messages
-  {$ifdef HASAMIGA}
   if HasResizeWindow(nw, nh) then
   begin
     try
@@ -71,7 +68,6 @@ begin
     Result := $011B; // return as ESC
     Exit;
   end;
-  {$endif}
 end;
 
 procedure ProcessMessages;
@@ -86,9 +82,7 @@ begin
     me.Action := 0;
     if GetNextMouseEvent(me) and Assigned(OnMouseEvent) then
       OnMouseEvent(me);
-    {$ifdef HASAMIGA}
     CheckForAppMsgs;
-    {$endif}
   except
     on e: Exception do
     begin

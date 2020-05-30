@@ -447,11 +447,9 @@ var
   s: string;
   Parts: TStringList;
   NEntry: TListEntry;
-  {$ifdef HASAMIGA}
   dl: PDosList;
   CDir: TArchiveDir;
   AE: TArchiveEntry;
-  {$endif}
   ListToGet: LongWord;
 begin
   FGPen := LightGray;
@@ -465,7 +463,6 @@ begin
       ListToGet := LDF_VOLUMES or LDF_ASSIGNS or LDF_READ;
       if WithDevices then
         ListToGet := ListToGet or LDF_DEVICES;
-      {$ifdef HASAMIGA}
       dl := LockDosList(ListToGet);
       //
       dl := NextDosEntry(dl, ListToGet);
@@ -492,16 +489,13 @@ begin
         dl := NextDosEntry(dl, ListToGet);
       end;
       UnlockDosList(ListToGet);
-      {$endif}
     end
     else
     begin
-      {$ifdef HASAMIGA}
       NEntry := TListEntry.Create;
       NEntry.Name := '/';
       NEntry.EType := etParent;
       FFileList.Add(NEntry);
-      {$endif}
       if InArchive then
       begin
         s := Copy(FCurrentPath, Pos(#10, FCurrentPath), Length(FCurrentPath));
@@ -1831,9 +1825,7 @@ var
   FL: TEntryList;
   dirs, Files, NotCopied, i, NumBytes, AllBytes: Integer;
   Count,WrittenCount, AllNumBytes, IsSame: LongInt;
-  {$ifdef HASAMIGA}
   SrcLock, DestLock: BPTR;
-  {$endif}
   Buffer: PByte;
   Src, Dest: TFileStream;
   AllBytesStr: String;
@@ -1900,7 +1892,6 @@ begin
             // check if the same file
             if FileExists(IncludeTrailingPathDelimiter(Target) + FL[0].Name) then
             begin
-              {$ifdef HASAMIGA}
               SrcLock := Lock(PChar(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name), SHARED_LOCK);
               DestLock := Lock(PChar(IncludeTrailingPathDelimiter(Target) + FL[0].Name), SHARED_LOCK);
               IsSame := SameLock(SrcLock, DestLock);
@@ -1908,7 +1899,6 @@ begin
               UnLock(DestLock);
               if IsSame = LOCK_SAME then
                 raise Exception.Create('Cannot copy on itself');
-              {$endif}
               if not AskQuestion('File "' + FL[0].Name +'" already exists, Overwrite?'#13#10 + OverwriteText(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name, IncludeTrailingPathDelimiter(Target) + FL[0].Name)) then
                 Exit;
               PG.Paint;
@@ -1999,7 +1989,6 @@ begin
               begin
                 if FileExists(IncludeTrailingPathDelimiter(Target) + FL[i].Name) then
                 begin
-                  {$ifdef HASAMIGA}
                   SrcLock := Lock(PChar(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name), SHARED_LOCK);
                   DestLock := Lock(PChar(NewName), SHARED_LOCK);
                   IsSame := SameLock(SrcLock, DestLock);
@@ -2007,7 +1996,6 @@ begin
                   UnLock(DestLock);
                   if IsSame = LOCK_SAME then
                     raise Exception.Create('Can''t copy on itself');
-                  {$endif}
                   if Res = mrNone then
                   begin
                     Res := AskMultipleQuestion('File "' + FL[i].Name +'" already exists, Overwrite?'#13#10 + OverwriteText(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name, IncludeTrailingPathDelimiter(Target) + FL[i].Name));
@@ -2095,9 +2083,7 @@ var
   FL: TEntryList;
   dirs, Files, NotCopied, i, NumBytes, AllBytes: Integer;
   Count,WrittenCount, AllNumBytes, IsSame: LongInt;
-  {$ifdef HASAMIGA}
   SrcLock, DestLock: BPTR;
-  {$endif}
   Buffer: PByte;
   Src, Dest: TFileStream;
   AllBytesStr: String;
@@ -2148,13 +2134,11 @@ begin
     NotCopied := 0;
     IsSameDevice := False;
     //check if we can use the shortcut move
-    {$ifdef HASAMIGA}
     SrcLock := Lock(PChar(ExcludeTrailingPathDelimiter(FCurrentPath)), SHARED_LOCK);
     DestLock := Lock(PChar(ExcludeTrailingPathDelimiter(Target)), SHARED_LOCK);
     IsSameDevice := SameDevice(SrcLock, DestLock);
     Unlock(SrcLock);
     UnLock(DestLock);
-    {$endif}
     if IsSameDevice then
     begin
       DoListOfSelectedFile(False, FL, dirs, files, Size);
@@ -2211,7 +2195,6 @@ begin
             // check if the same file
             if FileExists(IncludeTrailingPathDelimiter(Target) + FL[0].Name) then
             begin
-              {$ifdef HASAMIGA}
               SrcLock := Lock(PChar(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name), SHARED_LOCK);
               DestLock := Lock(PChar(IncludeTrailingPathDelimiter(Target) + FL[0].Name), SHARED_LOCK);
               IsSame := SameLock(SrcLock, DestLock);
@@ -2219,7 +2202,6 @@ begin
               UnLock(DestLock);
               if IsSame = LOCK_SAME then
                 raise Exception.Create('Can''t move  on itself');
-              {$endif}
               if not AskQuestion('File "' + FL[0].Name +'" already exists, Overwrite?'#13#10 + OverwriteText(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name, IncludeTrailingPathDelimiter(Target) + FL[0].Name)) then
                 Exit;
             end;
@@ -2309,7 +2291,6 @@ begin
               begin
                 if FileExists(IncludeTrailingPathDelimiter(Target) + FL[i].Name) then
                 begin
-                  {$ifdef HASAMIGA}
                   SrcLock := Lock(PChar(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name), SHARED_LOCK);
                   DestLock := Lock(PChar(NewName), SHARED_LOCK);
                   IsSame := SameLock(SrcLock, DestLock);
@@ -2317,7 +2298,6 @@ begin
                   UnLock(DestLock);
                   if IsSame = LOCK_SAME then
                     raise Exception.Create('Can''t move on itself');
-                  {$endif}
                   if Res = mrNone then
                     Res := AskMultipleQuestion('File "' + FL[i].Name +'" already exists, Overwrite?'#13#10 + OverwriteText(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name, IncludeTrailingPathDelimiter(Target) + FL[i].Name));
                   case Res of
@@ -2407,13 +2387,11 @@ end;
 
 initialization
 {$ifdef MorphOS}
-if NativeUInt(DosOutPut) = 0 then
-  PProcess(FindTask(nil))^.pr_COS := BPTR(MOS_ConHandle);
+  if NativeUInt(DosOutPut) = 0 then
+    PProcess(FindTask(nil))^.pr_COS := BPTR(MOS_ConHandle);
 {$else}
-  {$ifdef HASAMIGA}
   if NativeUInt(DosOutPut) = 0 then
     PProcess(FindTask(nil))^.pr_COS := BPTR(AOS_ConHandle);
-  {$endif}
 {$endif}
 end.
 
