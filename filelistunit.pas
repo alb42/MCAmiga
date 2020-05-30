@@ -5,9 +5,7 @@ unit FileListUnit;
 interface
 
 uses
-  {$ifdef HASAMIGA}
-  AmigaDOS, Exec, Utility,
-  {$endif}
+  AmigaDOS, Exec, Utility, Intuition,
   Video, Keyboard, Classes, SysUtils, Math, fgl, StrUtils, Mouse,
   ArchiveUnit;
 
@@ -111,7 +109,6 @@ type
 
     procedure SortList;
     procedure CheckSelected;
-    property InArchive: Boolean read GetInArchive;
   public
     constructor Create(ARect: TRect); virtual;
     destructor Destroy; override;
@@ -153,6 +150,7 @@ type
     property ActiveEntry: TListEntry read GetActiveEntry;
     property PanelRect: TRect read FRect;
     property OtherSide: TFileList read FOtherSide write FOtherSide;
+    property InArchive: Boolean read GetInArchive;
   end;
 
 
@@ -167,6 +165,7 @@ type
 var
   WithDevices: Boolean = False;
   DefShowMenu: Boolean = False;
+  FullScreen: Boolean = False;
 
 implementation
 
@@ -1007,11 +1006,15 @@ begin
               cmd := IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name + ' ' + Params;
               if WithShiftPressed then
                 cmd := 'c:run ' + cmd;
+              if FullScreen then
+                WBenchToFront;
               Ret := SystemTags(PChar(cmd), [TAG_END]);
               if Ret <> 0 then
                 ShowMessage(FFileList[FActiveElement].Name + ' returned with error message: ' + IntToStr(Ret));
               if WithShiftPressed then
                 Sleep(250);
+              if FullScreen then
+                 ScreenToFront(VideoWindow^.WScreen);
             end;
             except
               ;

@@ -5,7 +5,7 @@ unit dialogunit;
 interface
 
 uses
-  Exec, Utility, AmigaDos, FileListUnit,
+  Exec, Utility, AmigaDos, FileListUnit, Intuition,
   Types, Classes, SysUtils, Video, Keyboard, Mouse, Math, EventUnit;
 
 const
@@ -159,6 +159,7 @@ type
     procedure LzxPackEvent;
     procedure ShellEvent;
     procedure StartProgEvent;
+    procedure UnpackArchive;
   protected
     procedure ProcessMouse(MouseEvent: TMouseEvent); override;
     procedure DrawButtons; override;
@@ -187,6 +188,9 @@ procedure ShowTools(SrcPanel, DestPanel: TFileList);
 
 
 implementation
+
+uses
+  ArchiveUnit;
 
 const
   URCorner = #191;
@@ -223,7 +227,7 @@ const       //.........1.........2.........3.........4.........5........6.......
              ' Ctrl + R - Rescan Directory'#13#10 +
              ' Ctrl + O - Set Destination Directory to Source Directory'#13#10 +
              ' Ctrl + S - type to find entry in current directory'#13#10 +
-             ' Ctrl + M - Toggle bottom menu'#13#10 +
+             ' Ctrl + F - Toggle bottom menu'#13#10 +
              '';
 
   const       //.........1.........2.........3.........4.........5........6.........7
@@ -382,6 +386,8 @@ begin
     s := ExtractFilePath(s);
   end;
   SetCurrentDir(s);
+  if FullScreen then
+    WBenchToFront;
   SystemTags('c:run newcli', [NP_CLI, AsTag(True), TAG_END]);
 end;
 
@@ -394,7 +400,99 @@ begin
   begin
     NonWaitMessage('Start ' + ExtractFileName(ProgLine));
     s := IncludeTrailingPathDelimiter(SrcP.CurrentPath) + SrcP.ActiveEntry.Name;
+    if FullScreen then
+      WBenchToFront;
     SystemTags(PChar(Progline + ' ' + s), [TAG_END]);
+    if FullScreen then
+      ScreenToFront(VideoWindow^.WScreen);
+  end;
+end;
+
+procedure TToolsMenu.UnpackArchive;
+var
+  Arc: TArchiveBase;
+  ArcClass: TArchiveClass;
+  s: string;
+  PG: TSingleProgress;
+  AllCount: Integer;
+
+  procedure UnpackFiles(ArchiveDir: TArchiveDir; Base: string);
+  var
+    i: LongInt;
+    AE: TArchiveEntry;
+  begin
+    for i := 0 to ArchiveDir.Entries.Count - 1 do
+    begin
+      AE := ArchiveDir.Entries[i];
+      if AE is TArchiveDir then
+        UnpackFiles(TArchiveDir(AE), IncludeTrailingPathDelimiter(Base + AE.Name))
+      else
+      if AE is TArchiveFile then
+      begin
+        AllCount := AllCount + 1;
+        if not PG.UpdateValue(AllCount, 'Extract ' + AE.Name) then
+          raise Exception.Create('Stopped by user');
+        Arc.ExtractFile(Base + AE.Name, IncludeTrailingPathDelimiter(DestP.CurrentPath) + Base + AE.Name);
+      end;
+    end;
+  end;
+
+  function CountFiles(ArchiveDir: TArchiveDir): LongInt;
+  var
+    i: LongInt;
+    AE: TArchiveEntry;
+  begin
+    Result := 0;
+    for i := 0 to ArchiveDir.Entries.Count - 1 do
+    begin
+      AE := ArchiveDir.Entries[i];
+      if AE is TArchiveDir then
+        Result := Result + CountFiles(TArchiveDir(AE))
+      else
+      if AE is TArchiveFile then
+        Result := Result + 1;
+    end;
+  end;
+
+begin
+  if DestP.InArchive then
+  begin
+    ShowMessage('Unpack archive to archive not supported');
+    Exit;
+  end;
+  s := IncludeTrailingPathDelimiter(SrcP.CurrentPath) + SrcP.ActiveEntry.Name;
+  Arc := nil;
+  ArcClass := GetArchiver(s);
+  if Assigned(ArcClass) then
+  begin
+    try
+      Arc := ArcClass.Create;
+      if not Arc.ReadArchive(s) then
+      begin
+        ShowMessage('Error read archive');
+        Exit;
+      end;
+      PG := TSingleProgress.Create;
+      //Count Files
+      PG.MaxValue := CountFiles(Arc.AD);
+      PG.Text := 'Extract Files';
+      PG.Execute;
+      AllCount := 0;
+      //
+      try
+        UnpackFiles(Arc.AD, '');
+      except
+        on E:Exception do
+          ShowMessage(E.Message);
+      end;
+    finally
+      DestP.Update(True);
+      Arc.Free;
+    end;
+  end
+  else
+  begin
+    ShowMessage('No matching unpacker found.')
   end;
 end;
 
@@ -404,7 +502,7 @@ var
 begin
   if (MouseEvent.Action = MouseActionDown) and (MouseEvent.buttons = MouseLeftButton) then
   begin
-    NEntry := EnsureRange((MouseEvent.Y - InnerRect.Top) div 2, 0, High(Tools));
+    NEntry := EnsureRange(MouseEvent.Y - InnerRect.Top, 0, High(Tools));
     if NEntry = CurrentEntry then
     begin
       Tools[CurrentEntry].Event();
@@ -432,8 +530,8 @@ begin
   inherited;
 
   WindowRect.Left := Max(2, mid.x - Max(20, MaxLen + 1));
-  WindowRect.Top := Max(2, mid.y - Length(Tools) div 2 - 2);
-  WindowRect.Bottom := Min(ScreenHeight - 3, mid.y +  Length(Tools) div 2 + 2);
+  WindowRect.Top := Max(2, mid.y - Length(Tools) div 2 - 1);
+  WindowRect.Bottom := Min(ScreenHeight - 3, mid.y +  Length(Tools) div 2 + 1);
   WindowRect.Right :=  Min(ScreenWidth - 3, mid.x + Max(20, MaxLen + 1));
 
   DrawWindowBorder;
@@ -447,7 +545,7 @@ begin
 
     s := IntToStr(i + 1) + '    ' + Tools[i].AName;
     s := s + Space(InnerRect.Width - 6 - Length(S));
-    SetText(InnerRect.Left + 2, InnerRect.Top + i * 2, s);
+    SetText(InnerRect.Left + 2, InnerRect.Top + i, s);
   end;
   UpdateScreen(False);
 end;
@@ -458,6 +556,7 @@ begin
   AddToolsEntry('Pack selected with lha', @LhaPackEvent);
   AddToolsEntry('Pack selected with lzx', @lzxPackEvent);
   AddToolsEntry('Open file in external program', @StartProgEvent);
+  AddToolsEntry('Extract archive contents', @UnpackArchive);
 end;
 
 function TToolsMenu.Execute: TDialogResult;

@@ -759,7 +759,7 @@ begin
     begin
       st := GetKeyEventShiftState(Key);
       case (TranslateKeyEvent(Key) and $FFFF) of
-        $320D: begin                                       // Ctrl + m -> toggle visibility of bottom menu
+        $2106: begin                                       // Ctrl + f -> toggle visibility of bottom menu
           ShowMenu := not ShowMenu;
           ClearScreen;
           Paint;

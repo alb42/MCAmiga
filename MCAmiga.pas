@@ -25,7 +25,6 @@ var
 
   LeftDefaultPath: string = '';
   RightDefaultPath: string = '';
-  FullScreen: Boolean = FALSE;
 
 
 procedure SwapSrcDest;
@@ -136,8 +135,8 @@ begin
     $1312, $1300: Src.Update(True);                    // Ctrl + R Alt + R -> Reload
     $180F, $1800: Dest.CurrentPath := Src.CurrentPath; // Ctrl + O Alt + O -> copy path to dest
     $2004, $2000: Src.CurrentPath := '';               // Ctrl + D Alt + D -> back to drives/Assign
-    $1F13: Src.SearchList;                             // Crtl + s  -> jump mode
-    $320D: begin                                       // Ctrl + m -> toggle visibility of bottom menu
+    $1F13: Src.SearchList;                             // Crtl + S  -> jump mode
+    $2106: begin                                       // Ctrl + F -> toggle visibility of bottom menu
       DefShowMenu := not DefShowMenu;
       ClearScreen;
       Left.Resize(Rect(0, 0, (ScreenWidth div 2) - 1, ScreenHeight - 1));

@@ -75,7 +75,7 @@ F1       - Help
 F2       - Tools menu
 F10, ESC - Quit
 Ctrl + R - Rescan current directory
-Ctrl + M - Toggle visibility of bottom menu
+Ctrl + F - Toggle visibility of bottom menu
 Shift + Space - Scan Directory size
 
 Tooltypes:
