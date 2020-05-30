@@ -96,6 +96,15 @@ SHOWMENU  if this ToolType is present the Bottom menu is shown by program start
 History:
 ########
 
+0.6
+- fixed wordwarp in viewer fixed missing char
+- bottom menu line (with tooltype setting)
+- fixed parent select when leaving archive
+- tooltype for fullscreen (own screen) setting
+- Scroll help screen text if needed
+- catch exception for external programs
+- unpack archive in tools menu
+
 0.5
 - video fixes
 - browse, copy, move, rename, view/edit in lha/lzx archives
