@@ -2,16 +2,16 @@ program MCAmiga;
 {$mode objfpc}{$H+}
 uses
   {$ifdef HASAMIGA}
-  Exec, workbench, icon, AppWindowUnit, Intuition,
+  workbench, icon, AppWindowUnit, Intuition,
   {$endif}
   {$ifdef RELEASE}
   Versioncheck,
   {$endif}
-  Types, SysUtils, Video, mouse, keyboard, FileListUnit, dialogunit, EventUnit, archiveunit,
+  Types, SysUtils, Video, mouse, keyboard,
   {$if defined(Amiga68k) or defined(MorphOS) or defined(AROS)}
   xad, xadarchive,
   {$endif}
-  toolsunit;
+  FileListUnit, dialogunit, EventUnit, archiveunit;
 
 var
   Src: TFileList;
