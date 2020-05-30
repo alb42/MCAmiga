@@ -1682,14 +1682,15 @@ begin
         begin
           // message without waiting
           NonWaitMessage('Starting ' + ExtractFileName(OpenWithProgram));
-          Ret := ExecuteProcess(OpenWithProgram, [FileN]);
+          Ret := SystemTags(PChar(OpenWithProgram + ' ' + FileN), [TAG_END]);
           if Ret <> 0 then
           begin
             ShowMessage(OpenWithProgram + ' returned with error message: ' + IntToStr(Ret));
           end
           else
           begin
-            FArchive.PackFile(TempName, BasePath + FFileList[FActiveElement].Name);
+            if InArchive then
+              FArchive.PackFile(TempName, BasePath + FFileList[FActiveElement].Name);
           end;
         end;
       except

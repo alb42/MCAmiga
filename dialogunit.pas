@@ -186,6 +186,8 @@ procedure NonWaitMessage(AText: string);
 
 procedure ShowTools(SrcPanel, DestPanel: TFileList);
 
+var
+  DefaultShell: string = '';
 
 implementation
 
@@ -388,7 +390,7 @@ begin
   SetCurrentDir(s);
   if FullScreen then
     WBenchToFront;
-  SystemTags('c:run newcli', [NP_CLI, AsTag(True), TAG_END]);
+  SystemTags(PChar('c:run >NIL: newcli ' + DefaultShell), [NP_CLI, AsTag(True), TAG_END]);
 end;
 
 procedure TToolsMenu.StartProgEvent;

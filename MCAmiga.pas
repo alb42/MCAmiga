@@ -314,6 +314,8 @@ begin
     // Own Screen
     FullScreen := GetStrToolType(DObj, 'FULLSCREEN', '0') = '';
     //
+    DefaultShell := GetStrToolType(DObj, 'DEFAULTSHELL', '');
+    //
     FreeDiskObject(DObj);
   end;
 end;

@@ -93,6 +93,8 @@ WITHDEVICES=1 Show devices in the top overview also (together with assigns and v
 
 SHOWMENU  if this ToolType is present the Bottom menu is shown by program start
 
+DEFAULTSHELL= parameter for to define settings for the tools menu newshell define console size, name and parameter
+
 History:
 ########
 
