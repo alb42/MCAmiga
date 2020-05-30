@@ -788,26 +788,26 @@ begin
           if Mode = vmHex then
             CurrentByte := Max(0, CurrentByte - 1);
         end;
-        kbdPgUp, $39:begin
+        kbdPgUp, $39, $8D00:begin
           FUntilByte := 0;
           if Mode = vmText then
             StartLine := StartLine - 10;
           if Mode = vmHex then
             CurrentByte := Max(0, CurrentByte - Int64(ScreenHeight) * NumBytesPerLine);
         end;                                       // pg up -> Move around
-        kbdPgDn, $33:  begin
+        kbdPgDn, $33, $9100:  begin
           FUntilByte := 0;
           if Mode = vmText then
             StartLine := StartLine + 10;
           if Mode = vmHex then
             CurrentByte := Min(NumBytes - 1, CurrentByte + Int64(ScreenHeight) * NumBytesPerLine);
         end;                                      // pg down -> Move around
-        kbdHome, $37: begin
+        kbdHome, $37, $7300: begin
           FUntilByte := 0;
           FCurrentByte := 0;
           StartLine := 0;                      // Home -> Move around
         end;
-        kbdEnd, $31: begin
+        kbdEnd, $31, $7400: begin
           FUntilByte := 0;
           if Mode = vmText then
             StartLine := MaxInt                  // end -> Move around

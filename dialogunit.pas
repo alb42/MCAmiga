@@ -230,17 +230,21 @@ const       //.........1.........2.........3.........4.........5........6.......
              ' Ctrl + O - Set Destination Directory to Source Directory'#13#10 +
              ' Ctrl + S - type to find entry in current directory'#13#10 +
              ' Ctrl + F - Toggle bottom menu'#13#10 +
-             '';
+             ' Cursor Keys,4,6,8,2                   - navigate'#13#10  +
+             ' Ctrl Cursor Up,Down,Pg Up,9,Pg Down,3 - fast navigation'#13#10 +
+             ' Ctrl Cursor Left,Right,Home,7,End,1   - Jump to start/end'#13#10;
 
   const       //.........1.........2.........3.........4.........5........6.........7
-  HelpViewText = '       Editor Help       '#13#10 +
-                 ' F1  - Help                        F3/F10/ESC - Leave Viewer'#13#10 +
-                 ' F4  - Toggle ASCII and Hex View '#13#10 +
-                 ' F5  - Jump to line or address'#13#10 +
-                 ' F7  - Search                      Shift F7 - Search again'#13#10 +
-                 ' Cursor Keys(4,6,8,2) Pg Up(9), Pg Down(3),'#13#10 +
-                 '    Home(7), End(1) - navigate in Text'#13#10 +
-                 ' '#13#10 + '';
+  HelpViewText = ' ---- Viewer Help -----  '#13#10 +
+                 ' F1         - Help     '#13#10 +
+                 ' F3/F10/ESC - Leave Viewer'#13#10 +
+                 ' F4         - Toggle ASCII and Hex View '#13#10 +
+                 ' F5         - Jump to line or address'#13#10 +
+                 ' F7         - Search'#13#10 +
+                 ' Shift F7   - Search again'#13#10 +
+                 ' Cursor Keys,4,6,8,2                   - navigate in Text/Hex'#13#10  +
+                 ' Ctrl Cursor Up,Down,Pg Up,9,Pg Down,3 - fast navigation'#13#10 +
+                 ' Ctrl Cursor Left,Right,Home,7,End,1   - Jump to start/end'#13#10;
 
 procedure ShowHelp;
 begin
