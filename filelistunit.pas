@@ -950,9 +950,9 @@ begin
   else
   begin
     p := LastDelimiter(PathDelim + DriveDelim, s);
-    OldPath := Copy(s, p + 1, Length(s));
+    OldPath := StringReplace(Copy(s, p + 1, Length(s)), #10, '', [rfReplaceAll]);
     CurrentPath := Copy(s, 1, p);
-    ActivateFile(IncludeTrailingPathDelimiter(OldPath));
+    ActivateFile(OldPath);
   end;
 end;
 
@@ -1470,9 +1470,10 @@ procedure TFileList.ActivateFile(AName: string);
 var
   i: LongInt;
 begin
+  AName := ExcludeTrailingPathDelimiter(LowerCase(AName));
   for i := 0 to FFileList.Count - 1 do
   begin
-    if LowerCase(AName) = LowerCase(FFileList[i].Name) then
+    if AName = ExcludeTrailingPathDelimiter(LowerCase(FFileList[i].Name)) then
     begin
       ActiveElement := i;
       Break;
