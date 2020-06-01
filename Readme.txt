@@ -105,7 +105,7 @@ History:
 - archive bugfixes
 
 0.6
-- fixed wordwarp in viewer fixed missing char
+- fixed wordwrap in viewer fixed missing char
 - bottom menu line (with tooltype setting)
 - fixed parent select when leaving archive
 - tooltype for fullscreen (own screen) setting
