@@ -41,6 +41,11 @@ var
   LeftPath: string;
   RightPath: string;
 
+  ViewerLink: string = '';
+  AltViewerLink: string = '';
+  EditLink: string = '';
+  AltEditLink: string = '';
+
 
 type
   TEntryType = (etParent, etDir, etFile, etDrive, etAssign);
@@ -381,6 +386,9 @@ begin
   CheckSelected;
   if DefShowMenu and IsActive then
     DrawMenu;
+  // Draw screen flip button in the upper right edge
+  if FullScreen and IsActive then
+    SetText(ScreenWidth - 3, 0, LeftEdge + #8 + RightEdge);
 end;
 
 const
@@ -1640,7 +1648,11 @@ begin
         else
         begin
           NonWaitMessage('Starting ' + ExtractFileName(OpenWithProgram));
+          if FullScreen then
+            WBenchToFront;
           Ret := ExecuteProcess(OpenWithProgram, [FileN]);
+          if FullScreen then
+            ScreenToFront(VideoWindow^.WScreen);
           if Ret <> 0 then
             ShowMessage(OpenWithProgram + ' returned with error message: ' + IntToStr(Ret));
         end;
@@ -1682,7 +1694,11 @@ begin
         begin
           // message without waiting
           NonWaitMessage('Starting ' + ExtractFileName(OpenWithProgram));
+          if FullScreen then
+            WBenchToFront;
           Ret := SystemTags(PChar(OpenWithProgram + ' ' + FileN), [TAG_END]);
+          if FullScreen then
+            ScreenToFront(VideoWindow^.WScreen);
           if Ret <> 0 then
           begin
             ShowMessage(OpenWithProgram + ' returned with error message: ' + IntToStr(Ret));

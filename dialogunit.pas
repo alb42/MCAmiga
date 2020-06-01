@@ -14,7 +14,7 @@ const
 
 type
                 //yes     no,    yes to All    No to all      Abort   None
-  TDialogResult=(mrOK, mrCancel, mrAll,         mrNoAll,    mrAbort, mrNone);
+  TDialogResult=(mrOK, mrCancel, mrAll,         mrNoAll,    mrAbort, mrView, mrEdit, mrAgain, mrNone);
 
   { TBaseDialog }
 
@@ -160,6 +160,7 @@ type
     procedure ShellEvent;
     procedure StartProgEvent;
     procedure UnpackArchive;
+    procedure SearchStart;
   protected
     procedure ProcessMouse(MouseEvent: TMouseEvent); override;
     procedure DrawButtons; override;
@@ -186,14 +187,6 @@ procedure NonWaitMessage(AText: string);
 
 procedure ShowTools(SrcPanel, DestPanel: TFileList);
 
-var
-  DefaultShell: string = '';
-
-implementation
-
-uses
-  ArchiveUnit;
-
 const
   URCorner = #191;
   LLCorner = #192;
@@ -211,6 +204,14 @@ const
 
   ArrowUp = #24;
   ArrowDown = #25;
+
+var
+  DefaultShell: string = '';
+
+implementation
+
+uses
+  ArchiveUnit, searchunit;
 
 
 
@@ -502,6 +503,11 @@ begin
   end;
 end;
 
+procedure TToolsMenu.SearchStart;
+begin
+  StartSearch(SrcP);
+end;
+
 procedure TToolsMenu.ProcessMouse(MouseEvent: TMouseEvent);
 var
   NEntry: Integer;
@@ -563,6 +569,7 @@ begin
   AddToolsEntry('Pack selected with lzx', @lzxPackEvent);
   AddToolsEntry('Open file in external program', @StartProgEvent);
   AddToolsEntry('Extract archive contents', @UnpackArchive);
+  AddToolsEntry('Find Files', @SearchStart);
 end;
 
 function TToolsMenu.Execute: TDialogResult;

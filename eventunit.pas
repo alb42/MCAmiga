@@ -6,7 +6,7 @@ interface
 
 uses
   AppWindowUnit,
-  Classes, SysUtils, Video, Keyboard, Mouse;
+  Classes, SysUtils, Video, Keyboard, Mouse, Intuition, Math;
 
 type
   TOnKeyPress = procedure(Key: TKeyEvent);
@@ -30,6 +30,8 @@ var
   OnIdle: TProcedure = nil;
 
 implementation
+uses
+  FileListUnit;
 
 var
   Terminated: Boolean = False;
@@ -40,6 +42,12 @@ begin
   Result := PollMouseEvent(MouseEvent);
   if Result then
     GetMouseEvent(MouseEvent);
+  // Checvk if the upper right edge clicked to change screen
+  if FullScreen and (MouseEvent.Action = MouseActionDown) and (MouseEvent.buttons = MouseLeftButton) then
+  begin
+    if InRange(MouseEvent.X, ScreenWidth -3, ScreenWidth - 1) and (MouseEvent.Y = 0) then
+      ScreenToBack(VideoWindow^.WScreen);
+  end;
 end;
 
 function GetNextKeyEvent: TKeyEvent;

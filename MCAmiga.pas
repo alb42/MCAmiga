@@ -1,6 +1,7 @@
 program MCAmiga;
 {$mode objfpc}{$H+}
 uses
+  ATHreads,
   workbench, icon, AppWindowUnit, Intuition,
   {$ifdef RELEASE}
   Versioncheck,
@@ -9,17 +10,12 @@ uses
   {$if defined(Amiga68k) or defined(MorphOS) or defined(AROS)}
   xad, xadarchive,
   {$endif}
-  FileListUnit, dialogunit, EventUnit, archiveunit;
+  FileListUnit, dialogunit, EventUnit, archiveunit, searchunit;
 
 var
   Src: TFileList;
   Dest: TFileList;
   Left, Right: TFileList;
-
-  ViewerLink: string = '';
-  AltViewerLink: string = '';
-  EditLink: string = '';
-  AltEditLink: string = '';
 
   LeftDefaultPath: string = '';
   RightDefaultPath: string = '';
@@ -208,7 +204,7 @@ begin
     end
     {$ifndef RELEASE}
     else
-      if (ev and $FFFF) <> 0 then writeln('Key: $' + HexStr(TranslateKeyEvent(Ev), 4));
+      if (ev and $FFFF) <> 0 then writeln('Key: $' + HexStr(TranslateKeyEvent(Ev), 4), ' Shiftstate ', st);
     {$endif}
   end;
 end;

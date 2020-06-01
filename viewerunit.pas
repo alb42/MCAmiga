@@ -11,7 +11,7 @@ uses
 const
   VLine = #179;
 
-procedure FileViewer(AFileName: string);
+procedure FileViewer(AFileName: string; ASearch: string = ''; Posi: LongInt = -1);
 
 implementation
 
@@ -56,6 +56,8 @@ type
     procedure SearchBinary;
     function GetTextLine(Line: Integer): string;
     procedure FindBinary(SearchString: string; FromWhere: Integer);
+    procedure SearchBinaryPosition(Posi: LongInt; Len: LongInt);
+    procedure SearchTextPosition(Posi: LongInt; Len: LongInt);
   private
     FromSel, ToSel: TPoint;
     LastTextSearch: string;
@@ -64,16 +66,16 @@ type
   public
     constructor Create;
     destructor Destroy; override;
-    procedure Execute(AFilename: string);
+    procedure Execute(AFilename: string; ASearch: string = ''; Posi: LongInt = -1);
     property StartLine: Integer read FStartLine write SetStartLine;
     property CurrentByte: LongWord read FCurrentByte write SetCurrentByte;
   end;
 
-procedure FileViewer(AFileName: string);
+procedure FileViewer(AFileName: string; ASearch: string = ''; Posi: LongInt = -1);
 begin
   With TFileViewer.Create do
   begin
-    Execute(AFileName);
+    Execute(AFileName, ASearch, Posi);
     Free;
   end;
 end;
@@ -434,7 +436,7 @@ begin
   else
     Offset := 0;
   FCurrentByte := EnsureRange(AValue, 0, NumBytes);
-  while FCurrentByte >= ((FStartLine + (Int64(ScreenHeight) - 1 - Offset))) * NumBytesPerLine do
+  while Max(FCurrentByte, FUntilByte) >= ((FStartLine + (Int64(ScreenHeight) - 1 - Offset))) * NumBytesPerLine do
   begin
     if StartLine >= NumBytes div NumBytesPerLine - 1 - Offset then
       Break;
@@ -627,6 +629,39 @@ begin
   end;
 end;
 
+procedure TFileViewer.SearchBinaryPosition(Posi: LongInt; Len: LongInt);
+begin
+  FUntilByte := Posi + Len - 1;
+  CurrentByte := Posi;
+end;
+
+procedure TFileViewer.SearchTextPosition(Posi: LongInt; Len: LongInt);
+var
+  AbsPos, NextLine: NativeUInt;
+  i: Integer;
+begin
+  {$HINTS OFF}
+  AbsPos := PtrUInt(LineStarts[0]) + LongWord(Posi);
+  for i := 0 to LineStarts.Count - 1 do
+  begin
+    NextLine := NativeUInt(LineStarts[i]);
+    if NextLine > AbsPos then
+    begin
+      FromSel.Y := i - 1;
+      FromSel.X := AbsPos - NativeUInt(LineStarts[i - 1]) + 1;
+      ToSel.Y := i - 1;
+      ToSel.X := FromSel.X + Len;
+      if FStartLine < FromSel.Y then
+        StartLine := FromSel.Y;
+      if FStartLine + (ScreenHeight - 1) < ToSel.Y then
+        StartLine := ToSel.Y - (ScreenHeight - 1);
+      Paint;
+      Break;
+    end;
+  end;
+  {$HINTS ON}
+end;
+
 procedure TFileViewer.SearchText;
 var
   SearchString: string;
@@ -700,7 +735,7 @@ begin
   Result := a in [9, 10, 13, 26, 32..127, 169, 196..252];
 end;
 
-procedure TFileViewer.Execute(AFilename: string);
+procedure TFileViewer.Execute(AFilename: string; ASearch: string = ''; Posi: LongInt = -1);
 var
   Key: TKeyEvent;
   st: Byte;
@@ -750,6 +785,15 @@ begin
   else
     SwitchMode;
   //
+  // we got a search pattern
+  if Posi >= 0 then
+  begin
+    if Mode = vmHex then
+      SearchBinaryPosition(Posi, Length(ASearch))
+    else
+      SearchTextPosition(Posi, Length(ASearch));
+  end;
+
   Terminated := False;
   repeat
     Key := PollNextKey;
