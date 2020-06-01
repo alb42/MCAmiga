@@ -130,7 +130,7 @@ type
 
     procedure Update(UpdateList: Boolean);                  // update/repaint the panel, UpdateList = read data from disk
     procedure GoToParent;                                   // go to parent directory
-    procedure EnterPressed(WithShiftPressed: Boolean);      // Enter pressed on Entry
+    procedure EnterPressed(WithShiftPressed: Boolean; AllowExec: Boolean = True);      // Enter pressed on Entry
     function CheckForArchiveEnter(AName: string): Boolean;  // Check if a Entry is an archive and enter it (FArchive is assigned )
 
     procedure PackArchive(Format: TArchiveType);     // Tools Entries to pack a new lha/lzx
@@ -1029,7 +1029,7 @@ begin
 end;
 
 // user pressed enter (or shift Enter)
-procedure TFileList.EnterPressed(WithShiftPressed: Boolean);
+procedure TFileList.EnterPressed(WithShiftPressed: Boolean; AllowExec: Boolean = True);
 var
   s, Params: string;
   FS: TFileStream;
@@ -1070,6 +1070,8 @@ begin
           ToChange.Update(True);
           Exit;
         end;
+        if not AllowExec then
+          Exit;
         try
           // check if we are an Executable, if we have more of this, separate in a new routine to check magics
           FS := TFileStream.Create(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name, fmOpenRead);

@@ -131,9 +131,10 @@ var
 begin
   st := GetKeyEventShiftState(Ev);
   case TranslateKeyEvent(Ev) and $ffff of
-    $0F09, $0F00: SwapSrcDest;                                // (Shift) TAB -> change Focus to other window
-    $0008: Src.GoToParent;                                    // Backspace -> Parent
-    $1C0D, $000D: Src.EnterPressed(st and kbShift <> 0);      // return -> Enter Dir/Assign/Drive
+    $0F09, $0F00: SwapSrcDest;                                  // (Shift) TAB -> change Focus to other window
+    kbdLeft, $0008, $0034: Src.GoToParent;                       // Backspace, Left -> Parent
+    $1C0D, $000D: Src.EnterPressed(st and kbShift <> 0, True);  // return -> Enter Dir/Assign/Drive
+    kbdRight, $0036: Src.EnterPressed(False, False);  // return -> Enter Dir/Assign/Drive
     kbdUp, $38: begin if (st and kbShift) <> 0 then Src.SelectActiveEntry(False); Src.ActiveElement := Src.ActiveElement - 1; end;   // cursor up -> Move around
     kbdDown, $32: if (st and kbShift) <> 0 then Src.SelectActiveEntry else Src.ActiveElement := Src.ActiveElement + 1;  // cursor down -> Move around
     kbdPgUp, $39, $8D00: Src.ActiveElement := Src.ActiveElement - 10; // pg up -> Move around
