@@ -535,16 +535,17 @@ procedure TToolsMenu.Paint;
 var
   i: Integer;
   s: string;
+  AbsLen: LongInt;
 begin
   BGPen := Cyan;
   FGPen := White;
 
   inherited;
-
-  WindowRect.Left := Max(2, mid.x - Max(20, MaxLen + 1));
+  AbsLen := MaxLen + 5 + 2;
+  WindowRect.Left := Max(2, mid.x - AbsLen div 2 + 1);
   WindowRect.Top := Max(2, mid.y - Length(Tools) div 2 - 1);
-  WindowRect.Bottom := Min(ScreenHeight - 3, mid.y +  Length(Tools) div 2 + 1);
-  WindowRect.Right :=  Min(ScreenWidth - 3, mid.x + Max(20, MaxLen + 1));
+  WindowRect.Bottom := Min(ScreenHeight - 3, WindowRect.Top +  Length(Tools) + 1);
+  WindowRect.Right :=  Min(ScreenWidth - 3, mid.x + AbsLen div 2);
 
   DrawWindowBorder;
 
@@ -556,7 +557,7 @@ begin
       BGPen := Cyan;
 
     s := IntToStr(i + 1) + '    ' + Tools[i].AName;
-    s := s + Space(InnerRect.Width - 6 - Length(S));
+    s := s + Space(Max(0, InnerRect.Width - AbsLen - 1));
     SetText(InnerRect.Left + 2, InnerRect.Top + i, s);
   end;
   UpdateScreen(False);
@@ -1055,12 +1056,12 @@ end;
 procedure TAskQuestion.ConfigureButtons;
 begin
   SetLength(ButtonsArray, 2);
-  ButtonsArray[0].Rect := Rect(Mid.x - 5, WindowRect.Bottom, Mid.X, WindowRect.Bottom + 1);
+  ButtonsArray[0].Rect := Rect(Mid.x - 6, WindowRect.Bottom, Mid.X - 1, WindowRect.Bottom + 1);
   ButtonsArray[0].Pressed := False;
   ButtonsArray[0].Title := 'Yes';
   ButtonsArray[0].Result := mrOK;
 
-  ButtonsArray[1].Rect := Rect(Mid.x + 3, WindowRect.Bottom, Mid.x + 7, WindowRect.Bottom + 1);
+  ButtonsArray[1].Rect := Rect(Mid.x + 2, WindowRect.Bottom, Mid.x + 6, WindowRect.Bottom + 1);
   ButtonsArray[1].Pressed := False;
   ButtonsArray[1].Title := 'No';
   ButtonsArray[1].Result := mrCancel;
@@ -1189,10 +1190,10 @@ begin
   MaxX := MaxX + 4;
   MaxY := SL.Count + 4;
 
-  WindowRect.Left := Max(1, Mid.X - MaxX div 2);
-  WindowRect.Top := Max(1, Mid.Y - MaxY div 2);
-  WindowRect.Right :=  Min(ScreenWidth - 2, Mid.X + MaxX div 2);
-  WindowRect.Bottom := Min(ScreenHeight - 2 ,Mid.Y + MaxY div 2);
+  WindowRect.Left := Max(1, Mid.X - Ceil(MaxX / 2));
+  WindowRect.Top := Max(1, Mid.Y - Ceil(MaxY / 2));
+  WindowRect.Right :=  Min(ScreenWidth - 2, Mid.X + Floor(MaxX / 2) - 1);
+  WindowRect.Bottom := Min(ScreenHeight - 2 ,Mid.Y + Floor(MaxY / 2) - 1);
 
   BGPen := LightGray;
   FGPen := Black;

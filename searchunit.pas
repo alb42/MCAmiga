@@ -826,7 +826,7 @@ begin
 
   WindowRect.Left := 2;
   WindowRect.Top := Max(2, Mid.Y - 5);
-  WindowRect.Right := ScreenWidth - 2;
+  WindowRect.Right := ScreenWidth - 3;
   WindowRect.Bottom := Min(ScreenHeight - 2, Mid.Y + 5);
 
 
