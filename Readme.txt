@@ -98,6 +98,12 @@ DEFAULTSHELL= parameter for to define settings for the tools menu newshell defin
 History:
 ########
 
+0.7
+- Search function in tools menu
+- bugfixes for starting programs Fullscreen
+- fake depth gadget in fullscreen
+- archive bugfixes
+
 0.6
 - fixed wordwarp in viewer fixed missing char
 - bottom menu line (with tooltype setting)
