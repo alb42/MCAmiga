@@ -5,12 +5,12 @@ unit dialogunit;
 interface
 
 uses
-  Exec, Utility, AmigaDos, FileListUnit, Intuition,
+  Utility, AmigaDos, FileListUnit, Intuition,
   Types, Classes, SysUtils, Video, Keyboard, Mouse, Math, EventUnit;
 
 const
-  NumVERSION = '0.6';
-  VERSION = '$VER: MCAmiga 0.6 (30.05.2020)';
+  NumVERSION = '0.7';
+  VERSION = '$VER: MCAmiga 0.7 (01.06.2020)';
 
 type
                 //yes     no,    yes to All    No to all      Abort   None
