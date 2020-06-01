@@ -159,7 +159,7 @@ begin
               else
               begin
                 NonWaitMessage('Starting ' + ExtractFileName(ViewerLink));
-                Ret := SystemTags(PChar(ViewerLink + ' ' + s), [TAG_DONE]);
+                Ret := SystemTags(PChar(ViewerLink + ' "' + s + '"'), [TAG_DONE]);
                 if Ret <> 0 then
                   ShowMessage(ViewerLink + ' returned with error message: ' + IntToStr(Ret));
               end;
@@ -171,7 +171,7 @@ begin
               if EditLink <> '' then
               begin
                 NonWaitMessage('Starting ' + ExtractFileName(EditLink));
-                Ret := SystemTags(PChar(EditLink + ' ' + s), [TAG_DONE]);
+                Ret := SystemTags(PChar(EditLink + ' "' + s + '"'), [TAG_DONE]);
                 if Ret <> 0 then
                   ShowMessage(EditLink + ' returned with error message: ' + IntToStr(Ret));
               end;

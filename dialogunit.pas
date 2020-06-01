@@ -409,7 +409,7 @@ begin
     s := IncludeTrailingPathDelimiter(SrcP.CurrentPath) + SrcP.ActiveEntry.Name;
     if FullScreen then
       WBenchToFront;
-    SystemTags(PChar(Progline + ' ' + s), [TAG_END]);
+    SystemTags(PChar(Progline + ' "' + s + '"'), [TAG_END]);
     if FullScreen then
       ScreenToFront(VideoWindow^.WScreen);
   end;

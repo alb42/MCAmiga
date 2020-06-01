@@ -959,6 +959,7 @@ begin
   inherited Create;
   // Basic init
   FArchive := nil;
+  FCurrentPath := '-';
   //
   FMouseSelMode := msNone;
   FActiveElement := -1;
@@ -1084,7 +1085,7 @@ begin
               begin
                 NonWaitMessage('Starting ' + FFileList[FActiveElement].Name);
                 // form command line, shift -> start with run, unblocking
-                cmd := IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name + ' ' + Params;
+                cmd := '"' + IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name + '" ' + Params;
                 if WithShiftPressed then
                   cmd := 'c:run ' + cmd;
                 // Full Screen, bring WB to Front
@@ -1694,7 +1695,7 @@ begin
           NonWaitMessage('Starting ' + ExtractFileName(OpenWithProgram));
           if FullScreen then
             WBenchToFront;
-          Ret := ExecuteProcess(OpenWithProgram, [FileN]);
+          Ret := SystemTags(PChar(OpenWithProgram + ' "' + FileN + '"'), [TAG_END]);
           if FullScreen then
             ScreenToFront(VideoWindow^.WScreen);
           if Ret <> 0 then
@@ -1740,7 +1741,7 @@ begin
           NonWaitMessage('Starting ' + ExtractFileName(OpenWithProgram));
           if FullScreen then
             WBenchToFront;
-          Ret := SystemTags(PChar(OpenWithProgram + ' ' + FileN), [TAG_END]);
+          Ret := SystemTags(PChar(OpenWithProgram + ' "' + FileN + '"'), [TAG_END]);
           if FullScreen then
             ScreenToFront(VideoWindow^.WScreen);
           if Ret <> 0 then
@@ -2161,7 +2162,7 @@ begin
   if InArchive then
   begin
     try
-      if OtherSide.FArchive.IsReadOnly then
+      if FArchive.IsReadOnly then
         ShowMessage('Writing for that type is not supported')
       else
         ExtractSelectedFiles(True);
