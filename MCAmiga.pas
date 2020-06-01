@@ -20,7 +20,7 @@ var
   LeftDefaultPath: string = '';
   RightDefaultPath: string = '';
 
-
+// Swap Destination and Source -> change the Focus
 procedure SwapSrcDest;
 var
   Temp: TFileList;
@@ -32,21 +32,27 @@ begin
   Dest.IsActive := False;
 end;
 
+// Mouse Event, handling all Mouse Events of main application
+// connected to EventUnit OnMouseEvent
 procedure MouseEvent(Me: TMouseEvent);
 var
   P: TPoint;
   Len: LongInt;
 begin
+  // react on Mouse down, Panel will check for right/left
   if me.Action = MouseActionDown then
   begin
     P := Point(Me.x, Me.y);
+    // check if left panel is hit by mouse
     if Left.PanelRect.Contains(P) then
     begin
+      // click to panel also activate the panel
       if Right.IsActive then
         SwapSrcDest;
       Left.MouseEvent(Me);
       Exit;
     end;
+    // check if right panel is hit by mouse
     if Right.PanelRect.Contains(P) then
     begin
       if Left.IsActive then
@@ -54,6 +60,7 @@ begin
       Right.MouseEvent(Me);
       Exit;
     end;
+    // special handling of the Bottom F Key Menu, if visible
     if (Me.y = ScreenHeight - 1) and DefShowMenu then
     begin
       Len := ScreenWidth div 10;
@@ -108,17 +115,24 @@ begin
     end;
   end
   else
+  begin
+    // all other events just gibve to src panel -> needed
+    // for click and move to selece
     Src.MouseEvent(Me);
+  end;
 end;
 
+
+// Key Event, handling all key Events of main application
+// connected to EventUnit OnKeyEvent
 procedure KeyEvent(Ev: TKeyEvent);
 var
   st: Byte;
 begin
   st := GetKeyEventShiftState(Ev);
   case TranslateKeyEvent(Ev) and $ffff of
-    $0F09: SwapSrcDest;                                        // TAB -> change Focus to other window
-    $0008: Src.GoToParent;                                     // Backspace -> Parent
+    $0F09, $0F00: SwapSrcDest;                                // (Shift) TAB -> change Focus to other window
+    $0008: Src.GoToParent;                                    // Backspace -> Parent
     $1C0D, $000D: Src.EnterPressed(st and kbShift <> 0);      // return -> Enter Dir/Assign/Drive
     kbdUp, $38: begin if (st and kbShift) <> 0 then Src.SelectActiveEntry(False); Src.ActiveElement := Src.ActiveElement - 1; end;   // cursor up -> Move around
     kbdDown, $32: if (st and kbShift) <> 0 then Src.SelectActiveEntry else Src.ActiveElement := Src.ActiveElement + 1;  // cursor down -> Move around
@@ -136,7 +150,7 @@ begin
       Left.Resize(Rect(0, 0, (ScreenWidth div 2) - 1, ScreenHeight - 1));
       Right.Resize(Rect((ScreenWidth div 2), 0, ScreenWidth - 1, ScreenHeight - 1));
     end;
-    kbdInsert, $23, $30, $20: begin
+    kbdInsert, $23, $30, $20: begin                    // Insert, #, 0, Space -> Select file, scan dir size
       if ((st and kbShift) <> 0) and (TranslateKeyEvent(Ev) and $ffff = $20) then
       begin
         Src.ScanSize;
@@ -144,10 +158,10 @@ begin
         Right.Update(False);
       end
       else
-        Src.SelectActiveEntry;   // Insert, #, 0, Space -> Select file
+        Src.SelectActiveEntry;
     end;
-    $002B: Src.SelectByPattern(True);                       // + -> Select files by pattern
-    $002D: Src.SelectByPattern(False);                      // - -> Deselect files by pattern
+    $002B: Src.SelectByPattern(True);                  // + -> Select files by pattern
+    $002D: Src.SelectByPattern(False);                 // - -> Deselect files by pattern
     kbdF10, $011B: begin                               // F10, ESC -> Quit
       if AskQuestion('Quit Program') then
       begin
@@ -210,36 +224,47 @@ begin
 end;
 
 var
-  MySize: TSize;
+  MySize: TSize; // prevent endless looping of resize
 
+// Resize of Window, is not supported by the original video unit, so we have to fake that
+// by changing the video mode
 procedure ResizeEvent(NewWidth, NewHeight: Integer);
 var
   Mode: TVideoMode;
 begin
+  // prevent looping
   if (NewWidth > 0) and (NewHeight > 0) and ((NewWidth <> MySize.cx) or (NewHeight <> MySize.cy)) then
   begin
     Mode.Col := 0;
+    // get video mode, it still has the old sizes, set the new sizes, and set again!
     Video.GetVideoMode(Mode);
     Mode.Col := NewWidth;
     Mode.Row := NewHeight;
+    // careful at this point a resize event will occur again
     Video.SetVideoMode(Mode);
     MySize.cx := NewWidth;
     MySize.cy := NewHeight;
+    // we have a new FAST clearscreen, there for we can do that here
     ClearScreen;
+    // let the panels resize
     Left.Resize(Rect(0, 0, (ScreenWidth div 2) - 1, ScreenHeight - 1));
     Right.Resize(Rect((ScreenWidth div 2), 0, ScreenWidth - 1, ScreenHeight - 1));
   end;
 end;
 
+// idle event, sent to src panel -> used to scroll too long filenames
 procedure IdleEvent;
 begin
   Src.IdleEvent;
 end;
 
+// Event when a item is dropped on the app window
 procedure DropEvent(Path, Name: string; MousePos: TPoint);
 begin
+  // not a path -> nothing to do
   if Path = '' then
     Exit;
+  // Which panel is hit
   if PtInRect(Left.PanelRect, MousePos) then
   begin
     Left.CurrentPath := Path;
@@ -254,6 +279,11 @@ begin
   end;
 end;
 
+// Get a ToolType as String
+// Entry = name of ToolType
+// Default = if ToolType Entry not found what to return
+// Returns the Value begin the '=' of the toolType if it's only a keyword
+// it will return an empty string (then better to have Default <> '')
 function GetStrToolType(DObj: PDiskObject; Entry: string; Default: string): string;
 var
   Res: PChar;
@@ -263,10 +293,12 @@ var
   {$endif}
 begin
   Result := Default;
+  // just to be sure
   if not assigned(Dobj) then
     Exit;
   if not Assigned(Dobj^.do_Tooltypes) then
     Exit;
+  // aros does not have this call until now, we have to parse for ourself
   {$ifdef AROS}
   TT := Dobj^.do_Tooltypes;
   while Assigned(TT^) do
@@ -280,17 +312,19 @@ begin
     Inc(TT);
   end;
   {$else}
+  // get the ToolType
   Res := FindToolType(Dobj^.do_Tooltypes, PChar(Entry));
   if Assigned(Res) then
     Result := Res;
   {$endif}
 end;
 
-
+// Get the settings from the icon
 procedure GetSettings;
 var
   DObj: PDiskObject;
 begin
+  // Load icon propertied
   DObj := GetDiskObject(PChar(ParamStr(0)));
   if Assigned(DObj) then
   begin
@@ -309,59 +343,67 @@ begin
     DefShowMenu := GetStrToolType(DObj, 'SHOWMENU', '0') = '';
     // Own Screen
     FullScreen := GetStrToolType(DObj, 'FULLSCREEN', '0') = '';
-    //
+    // Default Shell settings (CON:....)
     DefaultShell := GetStrToolType(DObj, 'DEFAULTSHELL', '');
     //
     FreeDiskObject(DObj);
   end;
 end;
 
+// Main procedure of MCAmiga
 procedure StartMe;
 var
   Mode: TVideoMode;
   VideoFontHeight, x,y: LongInt;
-
 begin
   LockScreenUpdate;
+  // defaults are available on every amiga style system
   LeftDefaultPath := 'sys:';
   RightDefaultPath := 'ram:';
+  // get prefs from tooltypes
   GetSettings;
-
+  // connect Events
   OnKeyPress := @KeyEvent;
   OnMouseEvent := @MouseEvent;
   OnResize := @ResizeEvent;
   OnIdle := @IdleEvent;
   OnDropItem := @DropEvent;
-
+  // Check Video size, set fullscreen if needed
   Mode.Col := 0;
   Video.GetVideoMode(Mode);
   if FullScreen then
     Mode.color := False;
   Video.SetVideoMode(Mode);
-  //
+  // create Main Panels, and link them together
   Left := TFileList.Create(Rect(0, 0, (ScreenWidth div 2) - 1, ScreenHeight - 1));
   Right := TFileList.Create(Rect((ScreenWidth div 2), 0, ScreenWidth - 1, ScreenHeight - 1));
   Left.OtherSide := Right;
   Right.OtherSide := Left;
-
+  // src and dest for easier handling
   Src := Left;
   Dest := Right;
-
+  // set the path for both panels -> both will load these and redraw
   Left.CurrentPath := LeftDefaultPath;
   Right.CurrentPath := RightDefaultPath;
 
+  // nasty hack to make FullScreen work
   if FullScreen then
   begin
+    // I don't know how big the char ist
+    // luckyly there is a video call translating the real to video coords
+    // so we can claculate back
     x := 1;
     y := 1;
     VideoFontHeight := 16;
     TranslateToCharXY(100, 100, x,y);
     if y > 0 then
       VideoFontHeight := 100 div y;
+    // start resize to the new calculated screen size
     ResizeEvent(VideoWindow^.GZZWidth div 8, VideoWindow^.GZZHeight div VideoFontHeight);
+    // strangely the opened video screen is not active
     ActivateWindow(VideoWindow);
   end;
-
+  // all done lets draw
   UnlockScreenUpdate;
   UpdateScreen(True);
 
@@ -371,11 +413,13 @@ begin
   {$ifdef RELEASE}
   CreateVersion;
   {$endif}
-
+  // Activate the App Window
   MakeAppWindow;
+  // run the main event cycle
   RunApp;
+  // Application is closed, remove everything
   DestroyAppWindow;
-
+  //
   Left.Free;
   Right.Free;
 end;

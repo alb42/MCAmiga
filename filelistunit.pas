@@ -13,14 +13,15 @@ uses
 type
   TArchiveType = (atLHA, atLZX);
 const
+  // Magic of Amiga exe (first 4 bytes), check before start
   AmigaExecMagic = $03F3;
 
+  // Archive settings for packing in tools menu
   ArchiveCmd: array[TArchiveType] of string = ('c:lha -r -x1', 'c:lzx -r -x1');
   ArchiveName: array[TArchiveType] of string = ('LHA', 'LZX');
   ArchiveExt: array[TArchiveType] of string = ('.lha', '.lzx');
 
-  ConDefault  : PChar ='CON:10/30/620/100/MCAmiga Console Output/CLOSE';
-
+  // character to draw the panel structures
   UpperLeftEdge = #201;
   UpperRightEdge = #187;
   LowerRightEdge = #188;
@@ -31,146 +32,148 @@ const
 
   LeftEdge = #181;
   RightEdge = #198;
-
+  // breaks in the line for the text
   LeftDivisor = #199;
   RightDivisor = #182;
 
 var
-  FGPen: Word = LightGray;
-  BGPen: Word = Blue;
-  LeftPath: string;
-  RightPath: string;
+  FGPen: Word = LightGray;  // front pen (video colors)
+  BGPen: Word = Blue;       // back pen (video colors)
 
+  // links for Viewer and Editor, empty = internal, AltLink = Shift + F-Key
   ViewerLink: string = '';
   AltViewerLink: string = '';
   EditLink: string = '';
   AltEditLink: string = '';
+  // settings from tooltypes
+  WithDevices: Boolean = False;  // show all devices in device list (or only show volumes and assigns)
+  DefShowMenu: Boolean = False;  // show bottom F-Key menu by default
+  FullScreen: Boolean = False;   // Switch to fullscreen
 
 
 type
-  TEntryType = (etParent, etDir, etFile, etDrive, etAssign);
+  TEntryType = (etParent, etDir, etFile, etDrive, etAssign); // types of entries in the panel, do not change, sorting depend on it
 
   { TListEntry }
 
   TListEntry = class
-    Name: string;
-    EType: TEntryType;
-    Size: Int64;
-    Selected: Boolean;
+    Name: string;       // Name without path
+    EType: TEntryType;  // type of entry
+    Size: Int64;        // size of file or directory if calculated
+    Selected: Boolean;  // selected by user
   public
     constructor Create; virtual;
-
-    procedure Assign(Src: TListEntry); virtual;
+    procedure Assign(Src: TListEntry); virtual; // copy data from other entry
   end;
 
+  // list of entries of a Directory
   TEntryObjectList = specialize TFPGObjectList<TListEntry>;
 
   { TEntryList }
-
+  // easier handling of entries
   TEntryList = class(TEntryObjectList)
   public
-    procedure AddFile(AName: string; Size: Int64);
-    procedure AddDir(AName: string);
-    procedure AddCopy(AEntry: TListEntry);
+    procedure AddFile(AName: string; Size: Int64); // add file
+    procedure AddDir(AName: string);               // add directory
+    procedure AddCopy(AEntry: TListEntry);         // make a copy of the given entry and put to list
   end;
 
-
+  // Mouse mode for click and drag (if first one is select, select all on drag)
   TMouseSelMode = (msNone, msSelect, msDeselect);
-
 
   { TFileList }
 
   TFileList = class
   private
-    function GetInArchive: Boolean;
+    function GetInArchive: Boolean; // returns if we are in a archive atm. (FArchive <> nil)
   private
-    FArchive: TArchiveBase;
+    FArchive: TArchiveBase; // if inside an archive, the archive class to handle it
 
-    FOtherSide: TFileList;
-    FMouseSelMode: TMouseSelMode;
-    FRect: TRect;
-    FInnerRect: TRect;
-    FCurrentPath: string;
-    FFileList: TEntryList;
-    FIsActive: Boolean;
-    FActiveElement: Integer;
-    FTopElement: Integer;
-    FBottomElement: Integer;
-    ActShowStart: LongInt;
+    FOtherSide: TFileList;        // link to other panel for easier access
+    FMouseSelMode: TMouseSelMode; // mouse mode for click and drag (if fist selected, select the other draged over, and _not_ toggle)
+    FRect: TRect;                 // the outer rectangle of the panel
+    FInnerRect: TRect;            // the inner rect (without border)
+    FCurrentPath: string;         // path of the current dir (empty = device list)
+    FFileList: TEntryList;        // list of files/dirs in current directory or devices/assigns on device list
+    FIsActive: Boolean;           // the focus is currently in this panel
+    FActiveElement: Integer;      // index in FFileList, currently active
+    FTopElement: Integer;         // top visible element (index in FFileList)
+    FBottomElement: Integer;      // last visible element (index in FFileList)
+    ActShowStart: LongInt;        // for scrolling name in the bottom area, start character
     function GetActiveEntry: TListEntry;
     procedure SetActiveElement(AValue: Integer);
     procedure SetCurrentPath(AValue: string);
-    procedure DrawBorder;
-    procedure DrawMenu;
-    procedure DrawContents(UpdateList: Boolean);
+    procedure DrawBorder;                         // Draw border of panel
+    procedure DrawMenu;                           // draw bottom F-Key menus
+    procedure DrawContents(UpdateList: Boolean);  // Draw the contents, and also load the directory
     procedure SetIsActive(AValue: Boolean);
-    procedure DrawActive(NActive: Integer);
-    procedure DrawEntry(Idx: Integer);
+    procedure DrawActive(NActive: Integer);       // Draw Active element (NActive = Index in FFileList)
+    procedure DrawEntry(Idx: Integer);            // Draw Entry in Contents (Idx in FFileList)
 
-    procedure ExtractSelectedFiles(AsMove: Boolean);
-    procedure PackSelectedFiles(AsMove: Boolean);
-
+    procedure ExtractSelectedFiles(AsMove: Boolean); // Extract files from archive from Src to Dest
+    procedure PackSelectedFiles(AsMove: Boolean);    // pack selected files/dirs from Src to Dest (asks for name)
+    // for all actions, make a list of selected files/dirs
+    // Recursive = True, it will also add all files of selected dirs
+    // Dirs, Files = number of dirs and files selected
+    // Size = number of bytes selected
     procedure DoListOfSelectedFile(Recursive: Boolean; FL: TEntryList; out Dirs: integer; out Files: Integer; out Size: Int64);
 
-    procedure SortList;
-    procedure CheckSelected;
+    procedure SortList;          // sort the FFileList after loaded
+    procedure CheckSelected;     // update the number of selected files and size at bottom of panel
   public
+    // Create the new Panel (ARect = outter limit of the panel)
     constructor Create(ARect: TRect); virtual;
+    // destroy panel
     destructor Destroy; override;
-
+    // Resize the panel (ARect = new outter limit of the panel)
     procedure Resize(ARect: TRect);
 
-    procedure Update(UpdateList: Boolean);
-    procedure GoToParent;
-    procedure EnterPressed(WithShiftPressed: Boolean);
-    function CheckForArchiveEnter(AName: string): Boolean;
-    function ResultOfEntry(out NewPath: string): Boolean;
+    procedure Update(UpdateList: Boolean);                  // update/repaint the panel, UpdateList = read data from disk
+    procedure GoToParent;                                   // go to parent directory
+    procedure EnterPressed(WithShiftPressed: Boolean);      // Enter pressed on Entry
+    function CheckForArchiveEnter(AName: string): Boolean;  // Check if a Entry is an archive and enter it (FArchive is assigned )
 
-    procedure PackArchive(Format: TArchiveType);
+    procedure PackArchive(Format: TArchiveType);     // Tools Entries to pack a new lha/lzx
 
-    procedure CopyFiles;      // F5
-    procedure MoveFiles;      // F6
-    procedure MakeDir;        // F7
-    procedure DeleteSelected; // F8
-    procedure Rename;         // Shift F6
+    procedure CopyFiles;      // F5 - copy selected entries to other panel)
+    procedure MoveFiles;      // F6 - move selected entries to other panel
+    procedure MakeDir;        // F7 - Create a new dir
+    procedure DeleteSelected; // F8 - Delete selected files
+    procedure Rename;         // Shift F6 - renamed active file/dir
 
-    procedure ActivateFile(AName: string);
-    procedure SelectActiveEntry(GoToNextEntry: Boolean = True);
+    procedure ActivateFile(AName: string);                       // Activate File via filename
+    procedure SelectActiveEntry(GoToNextEntry: Boolean = True);  // select the currently active entry and move to next entry
 
-    procedure ScanSize;
+    procedure ScanSize;     // scan size of currently selected entry
 
-    procedure IdleEvent;
-    procedure SearchList;
+    procedure IdleEvent;    // Idle call -> called by main application to scroll long filenames
+    procedure SearchList;   // Search jump for panel, only show chars which exists
 
-    procedure ViewFile(OpenWithProgram: string = '');
-    procedure EditFile(OpenWithProgram: string = '');
+    procedure ViewFile(OpenWithProgram: string = ''); // View File, if program is set open with external program
+    procedure EditFile(OpenWithProgram: string = ''); // Edit File with given program
 
-    procedure SelectByPattern(DoSelect: Boolean);
+    procedure SelectByPattern(DoSelect: Boolean);     // Select entries by pattern (or deselect)
 
-    procedure MouseEvent(Me: TMouseEvent);
+    procedure MouseEvent(Me: TMouseEvent);            // Mouse event (select entries, deselect entries with mouse)
 
-    property CurrentPath: string read FCurrentPath write SetCurrentPath;
-    property IsActive: Boolean read FIsActive write SetIsActive;
-    property ActiveElement: Integer read FActiveElement write SetActiveElement;
-    property ActiveEntry: TListEntry read GetActiveEntry;
-    property PanelRect: TRect read FRect;
-    property OtherSide: TFileList read FOtherSide write FOtherSide;
-    property InArchive: Boolean read GetInArchive;
+    property CurrentPath: string read FCurrentPath write SetCurrentPath;        // current path of the panel withou delimiter, Empty = device list,
+    property IsActive: Boolean read FIsActive write SetIsActive;                // is the focus in this panel
+    property ActiveElement: Integer read FActiveElement write SetActiveElement; // Index of the current list (Idx in FFileList)
+    property ActiveEntry: TListEntry read GetActiveEntry;                       // direct access to Active Entry
+    property PanelRect: TRect read FRect;                                       // Outer size of the panel
+    property OtherSide: TFileList read FOtherSide write FOtherSide;             // link to other panel
+    property InArchive: Boolean read GetInArchive;                              // are we are in a panel currently
   end;
 
-
-  function PosToArray(px, py: Integer): Integer; inline;
+  // write a Char to Video screen, either as Point or x,y coords
   procedure SetChar(p: Integer; c: Char); overload;
   procedure SetChar(x,y: Integer; c: Char); overload;
+  // write a Text to the Video screen at x,y in x direction
   procedure SetText(x,y: Integer; s: string);
+  // cut the filename to fit into MaxLength, replace the cutted text with '...', when Pathmode, let the start of path stay
   function LimitName(AName: string; MaxLength: Integer; PathMode: Boolean = False): string;
-
+  // get a temp file name
   function GetTempFileEvent(const Dir: string; const Prefix: string):string;
-
-var
-  WithDevices: Boolean = False;
-  DefShowMenu: Boolean = False;
-  FullScreen: Boolean = False;
 
 implementation
 
@@ -186,16 +189,21 @@ var
   i: Integer;
 begin
   Result := AName;
+  // if already fit into MaxLength, nothing to do, just leave
   if Length(AName) <= MaxLength then
     Exit;
+  // In path mode, we separate the Drive at start
   if Pathmode then
   begin
     SL := TStringList.Create;
+    // separate all path parts
     ExtractStrings([':', PathDelim], [], PChar(AName), SL);
+    // drive is always there
     if SL.Count > 0 then
     begin
       s1 := SL[0] + ':';
     end;
+    // add from back as long it fits into MaxLength
     s2 := '';
     for i := SL.Count - 1 downto 1 do
     begin
@@ -204,7 +212,9 @@ begin
         Break;
       s2 := s3;
     end;
+    // form the final string
     Result := s1 + '...' + s2;
+    // it's still too long (happen on VERY long assigns, use the other style)
     if Length(Result) > MaxLength then
     begin
       Result := '...' + s2;
@@ -216,6 +226,9 @@ begin
     Result := '...' + Copy(AName, Length(AName) - (MaxLength - 3), MaxLength - 2);
 end;
 
+// format Bytes to human readable kilo, mega nd giga byte...
+// please note it uses 1000 as divisor, so its real ISO prefixes not the
+// usualy ki, Mi, Gi, as usual, I'm a scientist after all
 function FormatSize(Size: Single): string;
 begin
   Size := Abs(Size);
@@ -233,22 +246,27 @@ begin
   end;
 end;
 
+// calculate the memory position from X and Y coords in Video array VideoBuf
 function PosToArray(px, py: Integer): Integer; inline;
 begin
   PosToArray := px + py * ScreenWidth;
 end;
 
+// Set char in VideoBuf by absolute point
 procedure SetChar(p: Integer; c: Char); overload;
 begin
   if (p >= 0) and (p < VideoBufSize) then
     VideoBuf^[p] := (BGPen shl 12) or (FGPen shl 8) or Byte(c);
 end;
 
+// Set Char by coord
 procedure SetChar(x,y: Integer; c: Char); overload;
 begin
   SetChar(PosToArray(x,y), c);
 end;
 
+// Set Text by coord, will just continue to write in x direction,
+// does not check for end of line, and just continue on the next line
 procedure SetText(x,y: Integer; s: string);
 var
   i: Integer;
@@ -313,10 +331,9 @@ begin
     Exit;
   if InArchive then
   begin
+    // we left the archive, no #10 in path anymore
     if Pos(#10, AValue) < 1 then
-    begin
       FreeAndNil(FArchive);
-    end;
   end;
   FCurrentPath := ExcludeTrailingPathDelimiter(AValue);
   Update(True);
@@ -326,7 +343,7 @@ procedure TFileList.SetActiveElement(AValue: Integer);
 begin
   if FActiveElement = AValue then
     Exit;
-  ActShowStart := 0;
+  ActShowStart := 0; // reset scroller for long names
   DrawActive(AValue);
 end;
 
@@ -347,18 +364,22 @@ var
   i: Integer;
   s: String;
 begin
+  // atm fixed colors
   FGPen := LightGray;
   BGPen := Blue;
+  // write the edges
   SetChar(FRect.Left, FRect.Top, UpperLeftEdge);
   SetChar(FRect.Left, FRect.Bottom, LowerLeftEdge);
   SetChar(FRect.Right, FRect.Top, UpperRightEdge);
   SetChar(FRect.Right, FRect.Bottom, LowerRightEdge);
+  // write top and bottom double and single line between contents and active show
   for i := FRect.Left + 1 to FRect.Right - 1 do
   begin
     SetChar(i, FRect.Top, HoriLine);
     SetChar(i, FRect.Bottom, HoriLine);
     SetChar(i, FRect.Bottom - 2, SingleLine);
   end;
+  // draw double line right and left
   for i := FRect.Top + 1 to FRect.Bottom - 1 do
   begin
     if i = FRect.Bottom - 2 then
@@ -372,6 +393,7 @@ begin
       SetChar(FRect.Right, i, VertLine);
     end;
   end;
+  // Create the name for top view, replace the #10 in archives by ':' like mc
   s := LimitName(StringReplace(FCurrentPath, #10, ':', [rfReplaceAll]) , FRect.Width - 5, True);
   if IsActive then
   begin
@@ -383,7 +405,9 @@ begin
   end
   else
     SetText(FRect.Left + 2, FRect.Top, LeftEdge + s + RightEdge);
+  // count selected files and count bytes and draw below the contents
   CheckSelected;
+  // redraw the menu if needed, always the current panel draws also the bottom menu
   if DefShowMenu and IsActive then
     DrawMenu;
   // Draw screen flip button in the upper right edge
@@ -391,7 +415,7 @@ begin
     SetText(ScreenWidth - 3, 0, LeftEdge + #8 + RightEdge);
 end;
 
-const
+const  // Menu names for the bottom F-Key F1-F0
   MenuNames: array[1..10] of string = ('Help', 'Tools', 'View', 'Edit', 'Copy', 'Move', 'MkDir', 'Delete', ' ', 'Quit');
 
 procedure TFileList.DrawMenu;
@@ -399,23 +423,27 @@ var
   Len, x, y, i: LongInt;
   s: string;
 begin
+  // we need 10 F-Keys
   Len := ScreenWidth div 10;
+  // clear all with cyan, so we do not have to care about not fitting texts
   BGPen := Cyan;
   FGPen := Black;
   for i := 0 to ScreenWidth - 1 do
   begin
     SetChar(i, FRect.Bottom + 1, ' ');
   end;
-
+  // just print all buttons
   for i := 1 to 10 do
   begin
+    // every button contains a F-Key show, 2 chars and the rest is the name
     x := (i - 1) * Len;
     y := FRect.Bottom + 1;
     s := Format('%2d', [i]);
     FGPen := White;
     BGPen := Black;
     SetText(x,y, s);
-    x := x + 2;
+    x := x + 2; // 2 chars used already
+    // cut the name to the rest of button
     s := Copy(MenuNames[i], 1, Len - 2);
     BGPen := Cyan;
     FGPen := Black;
@@ -428,9 +456,11 @@ const
   DLT_DIRECTORY = DLT_LOCK;
 {$endif}
 
+// not complete list of devices we do not want to see, I tried, OS3, OS4, MorphOS and AROS, but of course there could be more
 const
   IgnoredDevices: array[0..30] of string = ('USBRAW:', 'ZERO:', 'SYSCON:','SYSRAW:','PRINTER:', 'PS:', 'NULL:','MUICON:','IXPIPE:','AWNPIPE:', 'FIFO:','VNC:', 'VNR:', 'AUDIO:', 'AUX1:', 'AUX:', 'CON:', 'KCON:', 'KRAW:', 'PAR:', 'SER:', 'PIPE:', 'PRT:', 'RANDOM:', 'RAW:', 'RAW1:', 'SER:', 'SER1:', 'TCP:', 'TEXTCLIP:', 'URL:');
 
+// check if a device name is a ignored device
 function IsIgnored(ADevName: string): Boolean;
 var
   i: Integer;
@@ -447,7 +477,11 @@ begin
   end;
 end;
 
-
+// in principle the most important function
+// it contains two functions, update the contents (read the dir or devices, read archives)
+// draw the actual contents
+// maybe it would be better to separate them in 2 separate functions... but the draw is really tiny
+// since it's placed into own DrawEntry routine
 procedure TFileList.DrawContents(UpdateList: Boolean);
 var
   Info: TSearchRec;
@@ -466,6 +500,7 @@ begin
   if UpdateList then
   begin
     FFileList.Clear;
+    // current path empty = show Volumes and assigns
     if FCurrentPath = '' then
     begin
       ListToGet := LDF_VOLUMES or LDF_ASSIGNS or LDF_READ;
@@ -492,21 +527,27 @@ begin
             NEntry.EType := etAssign
           else
             NEntry.EType := etDrive;
-          FFileList.Add(NEntry);
+          FFileList.Add(NEntry); // build list to show
         end;
         dl := NextDosEntry(dl, ListToGet);
       end;
-      UnlockDosList(ListToGet);
+      UnlockDosList(ListToGet); // end
     end
     else
-    begin
+    begin   // we have a current path
+      // always a parent dir
       NEntry := TListEntry.Create;
       NEntry.Name := '/';
       NEntry.EType := etParent;
       FFileList.Add(NEntry);
+      // we are not in an archive but the Path says we are, try to load the archive
+      if not InArchive and (Pos(#10, FCurrentPath) > 0) then
+        CheckForArchiveEnter(Copy(FCurrentPath, 1, Pos(#10, FCurrentPath) - 1));
+      // special action if in Archive
       if InArchive then
       begin
-        s := Copy(FCurrentPath, Pos(#10, FCurrentPath), Length(FCurrentPath));
+        s := Copy(FCurrentPath, Pos(#10, FCurrentPath), Length(FCurrentPath)); // extract the in archive path
+        // extract the path parts and search in the archive for the current dir
         Parts := TStringList.Create;
         ExtractStrings(['/'], [], PChar(s), Parts);
         CDir := FArchive.AD;
@@ -516,50 +557,57 @@ begin
           if AE is TArchiveDir then
             CDir := TArchiveDir(AE);
         end;
+        // CDir is now the current dir, read all entries and put to the FFileList
         for i := 0 to CDir.Entries.Count - 1 do
         begin
           AE := CDir.Entries[i];
           NEntry := TListEntry.Create;
+          // dir
           if AE is TArchiveDir then
           begin
             NEntry.Name := AE.Name + '/';
             NEntry.EType := etDir;
           end;
+          // file
           if AE is TArchiveFile then
           begin
             NEntry.Name := AE.Name;
             NEntry.EType := etFile;
             NEntry.Size := TArchiveFile(AE).Size;
           end;
+          //
           FFileList.Add(NEntry);
         end;
         Parts.Free;
       end
       else
-      begin
+      begin    // not an archive and valid path, read directory
         if FindFirst(IncludeTrailingPathDelimiter(FCurrentPath) + '*', faAnyFile and faDirectory, Info) = 0 then
         begin
           repeat
             NEntry := TListEntry.Create;
+            // Dir
             if (Info.Attr and faDirectory) <> 0 then
             begin
               NEntry.Name := IncludeTrailingPathDelimiter(Info.Name);
               NEntry.EType := etDir;
             end
-            else
+            else // File
             begin
               NEntry.Name := Info.Name;
               NEntry.EType := etFile;
               NEntry.Size := Info.Size;
             end;
+            //
             FFileList.Add(NEntry);
           until FindNext(info) <> 0;
           FindClose(Info);
         end;
       end;
     end;
+    // Sort the List
     SortList;
-
+    // Check if the new list still in the list
     if (FTopElement < 0) or (FTopElement > FFileList.Count - 1) then
       FTopElement := 0
     else
@@ -571,22 +619,24 @@ begin
     if FActiveElement >= FFileList.Count then
       FActiveElement := 0;
   end;
+  // draw all entries
   for i := 0 to FInnerRect.Height do
   begin
     DrawEntry(FTopElement + i);
   end;
 end;
 
+// (de-)activate this panel
 procedure TFileList.SetIsActive(AValue: Boolean);
 begin
   if FIsActive = AValue then Exit;
     FIsActive := AValue;
-  DrawBorder();
-  DrawActive(FActiveElement);
-  UpdateScreen(False);
+  DrawBorder(); // must draw border because of top text
+  DrawActive(FActiveElement); // draw active
+  UpdateScreen(False); // do the update
 end;
 
-
+// draw the active Entry
 procedure TFileList.DrawActive(NActive: Integer);
 var
   OldActive, i, l, n: Integer;
@@ -640,14 +690,17 @@ begin
   UpdateScreen(False);
 end;
 
+// Draw Entry by Index
 procedure TFileList.DrawEntry(Idx: Integer);
 var
   s: String;
   l, n: Integer;
   Col: LongWord;
 begin
+  // not in view
   if not InRange(Idx - FTopElement, FInnerRect.Top - 1, FInnerRect.Bottom - 1) then
     Exit;
+  // active, other color
   if FIsActive and (Idx = FActiveElement) then
   begin
     FGPen := Blue;
@@ -658,9 +711,11 @@ begin
     FGPen := LightGray;
     BGPen := Blue;
   end;
+  // check if in list
   l := 0;
   if InRange(Idx, 0, FFileList.Count - 1) then
   begin
+    // specialized colors for every type and selected
     if FFileList[Idx].Selected then
     begin
       FGPen := Yellow;
@@ -674,16 +729,19 @@ begin
       etDrive:  col := White;
       etAssign: col := LightGray;
     end;
+    // invert color when focussed entry
     if FIsActive and (Idx = FActiveElement) then
-      BGPen := col and $F
+      BGPen := col and $F                            // make sure it's not blinking ;)
     else
       FGPen := col;
+    // limit the name, it's not a path, and write to video
     s := LimitName(FFileList[Idx].Name, FInnerRect.Width - 9);
     l := Length(s);
     SetText(FInnerRect.Left, FInnerRect.Top + Idx - FTopElement, s);
+    // fill the rest with spaces
     for n := 0 to FInnerRect.Width - l do
       SetChar(FInnerRect.Left + l + n, FInnerRect.Top + Idx - FTopElement, ' ');
-    // all 8 chars long
+    // all sizes or names 8 chars long
     case FFileList[Idx].EType of
       etFile: s := FormatSize(FFileList[Idx].Size);
       etDir: begin
@@ -700,9 +758,10 @@ begin
     end;
     SetText(FInnerRect.Right - 7, FInnerRect.Top + Idx - FTopElement, s);
   end
-  else
+  else  // not in list, just fill with spaces
     for n := 0 to FInnerRect.Width - l do
       SetChar(FInnerRect.Left + l + n, FInnerRect.Top + Idx - FTopElement, ' ');
+  // reset colors to default
   FGPen := LightGray;
   BGPen := Blue;
 end;
@@ -776,8 +835,6 @@ begin
 end;
 
 procedure TFileList.PackSelectedFiles(AsMove: Boolean);
-const
-  BufferSize = 1024 * 1024;
 var
   BasePath, Source, SrcName: string;
   FL: TEntryList;
@@ -837,21 +894,23 @@ begin
     PG.Free;
     FL.Free;
   end;
-
 end;
 
+// Comparer to sort the FFileList
 function ListCompare(const Item1, Item2: TListEntry): Integer;
 begin
-  Result := Ord(Item1.EType) - Ord(Item2.EType);
+  Result := Ord(Item1.EType) - Ord(Item2.EType); // sort the items -> dirs for files
   if Result = 0 then
-    Result := CompareText(Item1.Name, Item2.Name);
+    Result := CompareText(Item1.Name, Item2.Name); // if same type sort by name
 end;
 
+// sort FileList
 procedure TFileList.SortList;
 begin
   FFileList.Sort(@ListCompare);
 end;
 
+// count selected and not selected files with size and draw to border
 procedure TFileList.CheckSelected;
 var
   n,i: LongInt;
@@ -864,6 +923,7 @@ begin
   All := 0;
   for i := 0 to FFileList.Count - 1 do
   begin
+    // ignore parent
     if FFileList[i].EType in [etFile, etDir, etAssign, etDrive] then
     begin
       Inc(All);
@@ -875,25 +935,29 @@ begin
       end;
     end;
   end;
+  // drawing
   BGPen := Blue;
   FGPen := LightGray;
+  // delete the old entry
   for i := FRect.Left + 1 to FRect.Right - 1 do
-  begin
     SetChar(i, FRect.Bottom - 2, SingleLine);
-  end;
+  // set new text
   SetText(FRect.Left + 1, FRect.Bottom - 2, ' ' + IntToStr(n) + '/' + IntToStr(All) + ' ');
+  // ignore size if nothing selected
   if s > 0 then
   begin
     st := Trim(FormatSize(s) + 'byte');
     SetText(FRect.Right - 1 - Length(st), FRect.Bottom - 2, st);
   end;
+  // repaint
   UpdateScreen(False);
 end;
 
+// basic create
 constructor TFileList.Create(ARect: TRect);
 begin
   inherited Create;
-  DefShowMenu := DefShowMenu;
+  // Basic init
   FArchive := nil;
   //
   FMouseSelMode := msNone;
@@ -909,12 +973,15 @@ begin
   FFileList := TEntryList.Create(True);
 end;
 
+// kill me
 destructor TFileList.Destroy;
 begin
+  FArchive.Free;
   FFileList.Free;
   inherited Destroy;
 end;
 
+// resize event
 procedure TFileList.Resize(ARect: TRect);
 begin
   FRect := ARect;
@@ -926,6 +993,7 @@ begin
   Update(False);
 end;
 
+// Update Everyting, UpdateList = Also scan the directory again
 procedure TFileList.Update(UpdateList: Boolean);
 begin
   DrawBorder();
@@ -935,6 +1003,7 @@ begin
   UpdateScreen(False);
 end;
 
+// Go To parent dir
 procedure TFileList.GoToParent;
 var
   p: SizeInt;
@@ -954,10 +1023,11 @@ begin
     p := LastDelimiter(PathDelim + DriveDelim, s);
     OldPath := StringReplace(Copy(s, p + 1, Length(s)), #10, '', [rfReplaceAll]);
     CurrentPath := Copy(s, 1, p);
-    ActivateFile(OldPath);
+    ActivateFile(OldPath); // activate the Dir we just left
   end;
 end;
 
+// user pressed enter (or shift Enter)
 procedure TFileList.EnterPressed(WithShiftPressed: Boolean);
 var
   s, Params: string;
@@ -967,25 +1037,32 @@ var
   ToChange: TFileList;
   cmd: string;
 begin
+  // shift open it on other side
   if WithShiftPressed then
     ToChange := OtherSide
   else
     ToChange := Self;
+  // are we in
   if InRange(FActiveElement, 0, FFileList.Count - 1) then
   begin
     s := CurrentPath;
     case FFileList[FActiveElement].EType of
+      // ####### Dir
       etDir: begin
         ToChange.CurrentPath := IncludeTrailingPathDelimiter(s) + FFileList[FActiveElement].Name;
         ToChange.ActiveElement :=  0;
       end;
+      // ####### Volume and assign
       etDrive,
       etAssign: begin
         ToChange.CurrentPath := FFileList[FActiveElement].Name;
         ToChange.ActiveElement :=  0;
       end;
+      // ####### Parent
       etParent: GoToParent;
+      // ####### File
       etFile: begin
+        // if archive, just enter
         if ToChange.CheckForArchiveEnter(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name) then
         begin
           ToChange.FCurrentPath := ToChange.FArchive.ArchiveName + #10;
@@ -993,34 +1070,41 @@ begin
           Exit;
         end;
         try
+          // check if we are an Executable, if we have more of this, separate in a new routine to check magics
           FS := TFileStream.Create(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name, fmOpenRead);
           Magic := 0;
           FS.Read(Magic, SizeOf(LongWord));
           FS.Free;
           FS := nil;
-          if Magic = AmigaExecMagic then
+          if Magic = AmigaExecMagic then // we are an exe, start it
           begin
             Params := '';
             try
-            if AskForName('Parameter:', Params, False) then
-            begin
-              NonWaitMessage('Starting ' + FFileList[FActiveElement].Name);
-              cmd := IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name + ' ' + Params;
-              if WithShiftPressed then
-                cmd := 'c:run ' + cmd;
-              if FullScreen then
-                WBenchToFront;
-              Ret := SystemTags(PChar(cmd), [TAG_END]);
-              if Ret <> 0 then
-                ShowMessage(FFileList[FActiveElement].Name + ' returned with error message: ' + IntToStr(Ret));
-              if WithShiftPressed then
-                Sleep(250);
-              if FullScreen then
-                 ScreenToFront(VideoWindow^.WScreen);
-            end;
+              if AskForName('Parameter:', Params, False) then  // ask user for parameter for that exe
+              begin
+                NonWaitMessage('Starting ' + FFileList[FActiveElement].Name);
+                // form command line, shift -> start with run, unblocking
+                cmd := IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name + ' ' + Params;
+                if WithShiftPressed then
+                  cmd := 'c:run ' + cmd;
+                // Full Screen, bring WB to Front
+                if FullScreen then
+                  WBenchToFront;
+                // do it
+                Ret := SystemTags(PChar(cmd), [TAG_END]);
+                if Ret <> 0 then
+                  ShowMessage(FFileList[FActiveElement].Name + ' returned with error message: ' + IntToStr(Ret));
+                // wait a bit and remove message
+                if WithShiftPressed then
+                  Sleep(250);
+                // fullscreen -> jump back
+                if FullScreen and not WithShiftPressed then
+                   ScreenToFront(VideoWindow^.WScreen);
+              end;
             except
               ;
             end;
+            // update to clear screen
             Self.Update(False);
             OtherSide.Update(False);
           end;
@@ -1032,18 +1116,21 @@ begin
   end;
 end;
 
+// check if the file is an archive we can enter
 function TFileList.CheckForArchiveEnter(AName: string): Boolean;
 var
   FAC: TArchiveClass;
 begin
   Result := False;
+  // already in archive, leave
   if InArchive then
   begin
     FArchive.Free;
     FArchive := nil;
   end;
+  // get archive for that type
   FAC := GetArchiver(AName);
-  if Assigned(FAC) then
+  if Assigned(FAC) then // we found the class, create it
   begin
     FArchive := FAC.Create;
     Result := FArchive.ReadArchive(AName);
@@ -1052,48 +1139,7 @@ begin
   end;
 end;
 
-function TFileList.ResultOfEntry(out NewPath: string): Boolean;
-var
-  p: SizeInt;
-  s: string;
-begin
-  Result := False;
-  if InRange(FActiveElement, 0, FFileList.Count - 1) then
-  begin
-    s := CurrentPath;
-    case FFileList[FActiveElement].EType of
-      etDir: begin
-        NewPath := IncludeTrailingPathDelimiter(s) + FFileList[FActiveElement].Name;
-        Result := True;
-      end;
-      etDrive,
-      etAssign: begin
-        NewPath := FFileList[FActiveElement].Name;
-        Result := True;
-      end;
-      etParent: begin
-        s := CurrentPath;
-        p := Length(s);
-        if p = 0 then
-          Exit;
-        if s[p] = DriveDelim then
-        begin
-          NewPath := '';
-          Result := True;
-        end
-        else
-        begin
-          p := LastDelimiter(PathDelim + DriveDelim, s);
-          NewPath := Copy(s, 1, p);
-          Result := True;
-        end;
-      end;
-      else
-        Result := False;
-    end;
-  end;
-end;
-
+// Pack the archive
 procedure TFileList.PackArchive(Format: TArchiveType);
 var
   cmd, TempName, NewName, FilenameToPack: string;
@@ -1168,18 +1214,18 @@ begin
   NewName := '';
   if InArchive and FArchive.IsReadOnly then
     ShowMessage('Writing for that type is not supported');
-  //
+  // ask user for name
   if AskForName('Name for the new directory: ', NewName) then
   begin
     if InArchive then
-    begin
+    begin  // archive special case
       BasePath := IncludeTrailingPathDelimiter(Copy(CurrentPath, Pos(#10, CurrentPath) + 2, Length(CurrentPath)));
       FArchive.CreateDir(BasePath + NewName);
       FArchive.RescanArchive;
       Update(True);
     end
     else
-    begin
+    begin  // create dir
       if not SysUtils.CreateDir(IncludeTrailingPathDelimiter(FCurrentPath) + NewName) then
         ShowMessage('Unable to create dir "' + NewName + '"');
       Update(True);
@@ -1192,7 +1238,7 @@ begin
 end;
 
 var
-  CountPG: TSingleProgress = nil;
+  CountPG: TSingleProgress = nil; // Progress bar for counting
 
 procedure RecurseDirsArchive(BasePath, AName: string; FArchiveDir: TArchiveDir; FL: TEntryList; var Dirs: Integer; var Files: Integer; var Size: Int64);
 var
@@ -1550,9 +1596,7 @@ begin
   SearchName := '';
   NSearchName := '';
   for i := FInnerRect.Left to FInnerRect.Right do
-  begin
     SetChar(i, FRect.Bottom - 1, ' ');
-  end;
   SetCursorType(crUnderline);
   SetCursorPos(FInnerRect.Left, FRect.Bottom - 1);
   repeat
