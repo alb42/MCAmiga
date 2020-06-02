@@ -20,43 +20,45 @@ type
 
   TBaseDialog = class
   protected
-    Mid: TPoint;
-    WindowRect: TRect;
-    InnerRect: TRect;
-    procedure ProcessMouse(MouseEvent: TMouseEvent); virtual;
+    Mid: TPoint;  // middle Point of the screen
+    WindowRect: TRect; // Outer rectangle of the dialog
+    InnerRect: TRect;  // inner rectangle of the dialog
+    procedure ProcessMouse(MouseEvent: TMouseEvent); virtual; // process mouse event
   protected
-    function PollNextKey: TKeyEvent; virtual;
-    procedure DrawButtons; virtual; abstract;
-    procedure DrawWindowBorder; virtual;
-    procedure Paint; virtual; // Draw the window
+    function PollNextKey: TKeyEvent; virtual; // get next Key event or 0 if no key is pressed
+    procedure DrawButtons; virtual; abstract; // Draw buttons if buttons avail
+    procedure DrawWindowBorder; virtual;      // Draw the border of the dialog, set Windowrect first
+    procedure Paint; virtual;                 // Draw the dialog
   public
-    function Execute: TDialogResult; virtual; abstract; // returns the number of the Button pressed
+    function Execute: TDialogResult; virtual; abstract; // Start dialog and return the number of the Button pressed
   end;
 
   { TShowMessage }
-
+  // a stndard message to the user with an OK Button, als used as base class for
+  // all other messages with a text and some buttons
   TShowMessage = class(TBaseDialog)
   protected
-    WithScroll: Boolean;
-    TopLine: LongInt;
-    SelectedButton: Integer;
-    ButtonsArray: array of record
-      Rect: TRect;
-      Pressed: Boolean;
-      Title: string;
-      Result: TDialogResult;
+    WithScroll: Boolean;           // has a scroll bar
+    TopLine: LongInt;              // top visible line of the text
+    SelectedButton: Integer;       // currently selected button, Index in ButtonsArray
+    ButtonsArray: array of record  // all Buttons of the Dialog, use Configure Buttons to set
+      Rect: TRect;                   // ractangle of the button
+      Pressed: Boolean;              // after GetNextKeyEvent, check if this button was pressed during the event
+      Title: string;                 // text of the Button
+      Result: TDialogResult;         // Result of to be set for Execute when Button is pressed
     end;
-    procedure DrawButtons; override;
-    procedure ConfigureButtons; virtual;
-    procedure Paint; override; // Draw the window
-    procedure ProcessMouse(MouseEvent: TMouseEvent); override; // click to ok
+    procedure DrawButtons; override;     // redraw all Buttons (w.g. when changed focus)
+    procedure ConfigureButtons; virtual; // set properties of all Buttons
+    procedure Paint; override;           // Draw the window
+    procedure ProcessMouse(MouseEvent: TMouseEvent); override; // check if the mouse clicked on something
   public
     Text: string; // set before Execute!
     function Execute: TDialogResult; override; // returns the number of the Button pressed
   end;
 
   { TNonWaitMessage }
-
+  // standard text message without a button, which closes itself after the
+  // action is done, for example, start en external program with blocking
   TNonWaitMessage = class(TShowMessage)
   protected
     procedure DrawButtons; override;
@@ -65,21 +67,21 @@ type
   end;
 
   { TAskQuestion }
-
+  // Dialog asking a Yes/No Question
   TAskQuestion = class(TShowMessage)
   protected
     procedure ConfigureButtons; override;
   end;
 
   { TAskMultipleQuestion }
-
+  // Dialog Asking an Yes/Yes To All/No/No to All/Cancel question (overwrite file)
   TAskMultipleQuestion = class(TAskQuestion)
   protected
     procedure ConfigureButtons; override;
   end;
 
   { TAskForName }
-
+  // ask for a text input
   TAskForName = class(TAskQuestion)
   private
      TxtL, TxtR: LongInt;
@@ -96,7 +98,7 @@ type
   end;
 
   { TAskForNumber }
-
+  // ASk for a number (e.g. jump to line)
   TAskForNumber = class(TAskForName)
   protected
     function IsValidChar(c: Char): Boolean; override;
@@ -106,12 +108,19 @@ type
   end;
 
   { TSingleProgress }
-
+  // Progress bar with one text + progressbar and a cancel button
+  // usual way to use
+  // .Create
+  // Set .MaxValue
+  // Set .Text
+  // .Execute
+  // in the loop .UpdateValue
+  // .Free
   TSingleProgress = class(TBaseDialog)
   protected
-    LastCall: LongWord;
+    LastCall: LongWord;  // when it was last called, prevents too frequent redraws
     CurValue: LongWord;
-    Pup: LongInt;
+    Pup: LongInt;        // Postion saves to find the position of text and progressbar
     PGL: LongInt;
     PGR: LongInt;
     CancelPressed: Boolean;
@@ -119,74 +128,89 @@ type
     procedure DrawButtons; override;
     procedure ProcessMouse(MouseEvent: TMouseEvent); override; // click to ok
   public
-    MaxValue: LongWord;
-    Text: string;
+    MaxValue: LongWord;  // must be set before call Execute, last Value of the Progressbar
+    Text: string;        // initial Text above the progress bar
     procedure Paint; override;
-    function Execute: TDialogResult; override;
-    function UpdateValue(AValue: LongWord; NText: string = ''): Boolean; virtual;
+    function Execute: TDialogResult; override; // Init and start progressbar
+    function UpdateValue(AValue: LongWord; NText: string = ''): Boolean; virtual; // Update Progress value and text, if Text Empty, do not change the current text
   end;
 
   { TDoubleProgress }
-
+  // progressbar with a text a progress bar a text another progressbar and a cancel button
   TDoubleProgress = class(TSingleProgress)
   protected
     CurValue2: LongWord;
   public
-    MaxValue2: LongWord;
+    MaxValue2: LongWord; // set before execute, Indicies 2 means the lower progress bar, the inherited without index are the upper progressbar and text
     Text2: string;
-    function Execute: TDialogResult; override;
+    function Execute: TDialogResult; override; // Start and init the progressbars
     procedure Paint; override;
-    function UpdateValue(AValue: LongWord; NText: string = ''): Boolean; override;
-    function UpdateValue2(AValue1: LongWord; NText1: string = ''; AValue2: LongWord = 0; NText2: string = ''): Boolean;
+    function UpdateValue(AValue: LongWord; NText: string = ''): Boolean; override; // only update the upper bar
+    function UpdateValue2(AValue1: LongWord; NText1: string = ''; AValue2: LongWord = 0; NText2: string = ''): Boolean; // update both bars
   end;
 
   { TToolsMenu }
 
-  TToolsEvent = procedure of object;
+  TToolsEvent = procedure of object; // event when a tools entry is selected
 
+  // the tools menu
   TToolsMenu = class(TBaseDialog)
   private
-    Finished: Boolean;
-    CurrentEntry: LongInt;
-    Tools: array of record
-      AName: string;
-      Event: TToolsEvent;
+    Finished: Boolean;      // true -> close the tools menu
+    CurrentEntry: LongInt;  // currently selected entry
+    Tools: array of record  // list of Tools in the menu (max 10 until now)
+      AName: string;        // Text for the entry
+      Event: TToolsEvent;   // event to be called when menu entry is selected
     end;
-    MaxLen: Integer;
-    procedure AddToolsEntry(Name: string; Event: TToolsEvent);
+    MaxLen: Integer;        // Max length of text of all Tool Entries, for easier drawing and dialog size determination
+    procedure AddToolsEntry(Name: string; Event: TToolsEvent); // add a new tool to the menu
     // events
-    procedure LhaPackEvent;
-    procedure LzxPackEvent;
-    procedure ShellEvent;
-    procedure StartProgEvent;
-    procedure UnpackArchive;
-    procedure SearchStart;
+    procedure LhaPackEvent;    // pack selected files as lha to dest
+    procedure LzxPackEvent;    // pack selected files as lzx to dest
+    procedure ShellEvent;      // Open a new shell
+    procedure StartProgEvent;  // start a program with the current file as argument
+    procedure UnpackArchive;   // Unpack current archive to dest
+    procedure SearchStart;     // open the search requester
   protected
     procedure ProcessMouse(MouseEvent: TMouseEvent); override;
     procedure DrawButtons; override;
     procedure Paint; override;
   public
-    DestP, SrcP: TFileList;
+    DestP, SrcP: TFileList; // Links to both FilePanels, set before Execute
     constructor Create; virtual;
-    function Execute: TDialogResult; override;
+    function Execute: TDialogResult; override; // Start the tools menu
   end;
 
+// Shortcuts for easy use of the dialogs
 
+// ask a Yes/No Question
+function AskQuestion(AText: string): Boolean; // yes = true, no = False;
 
-
-function AskQuestion(AText: string): Boolean; // yes = true
+// ask a Yes/YesToAll/No/NoToAll/Cancel Question, (e.g. overwrite message)
 function AskMultipleQuestion(AText: string): TDialogResult;
+
+// ask for a name, useasName = True Limit input chars to valid file/dir names
 function AskForName(AText: string; var ANewName: string; UseAsName: Boolean = True): Boolean;
+
+// ask for a integer number (e.g go to line)
 function AskForNumber(AText: string; var ANewNumber: Integer): Boolean;
+
+// ask for a hexadeciaml number (0..9,A..F)
 function AskForHexNumber(AText: string; var HexString: string): Boolean;
 
+// Show help Text
 procedure ShowHelp;
+// Show Viewer Help TExt
 procedure ShowViewHelp;
+// Simple message
 procedure ShowMessage(AText: string);
+// message without button, returns directly, for blocking actions (e.g. starting external program)
 procedure NonWaitMessage(AText: string);
 
+// Show tools menu
 procedure ShowTools(SrcPanel, DestPanel: TFileList);
 
+// constants for dialog borders and contents drawing
 const
   URCorner = #191;
   LLCorner = #192;
@@ -205,16 +229,16 @@ const
   ArrowUp = #24;
   ArrowDown = #25;
 
+
 var
-  DefaultShell: string = '';
+  DefaultShell: string = ''; // default shell variable (e.g. CON:0/0/100/200/CLOSE) set by ToolType
 
 implementation
 
 uses
   ArchiveUnit, searchunit;
 
-
-
+// Help text for the main application! MaxLength 70
 const       //.........1.........2.........3.........4.........5........6.........7.........8
   HelpText = '     MyCommander Amiga Version ' + NumVERSION + ' '+{$INCLUDE %FPCTARGETCPU%} + '-' + {$INCLUDE %FPCTARGETOS%} +'  '#13#10 +
              '   =================================================  '#13#10 +
@@ -235,7 +259,8 @@ const       //.........1.........2.........3.........4.........5........6.......
              ' Ctrl Cursor Up,Down,Pg Up,9,Pg Down,3 - fast navigation'#13#10 +
              ' Ctrl Cursor Left,Right,Home,7,End,1   - Jump to start/end'#13#10;
 
-  const       //.........1.........2.........3.........4.........5........6.........7
+// Help Text for the Viewer
+const           //.........1.........2.........3.........4.........5........6.........7
   HelpViewText = ' ---- Viewer Help -----  '#13#10 +
                  ' F1         - Help     '#13#10 +
                  ' F3/F10/ESC - Leave Viewer'#13#10 +

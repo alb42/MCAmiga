@@ -9,11 +9,13 @@ uses
   Classes, SysUtils, fgl;
 
 type
+  // Entry (file or dir) of an Archive
   TArchiveEntry = class
   public
     Name: string;
   end;
 
+  // File inside an archive
   TArchiveFile = class(TArchiveEntry)
     Size: LongWord;
   end;
@@ -21,49 +23,49 @@ type
   TArchiveDirList = specialize TFPGObjectList<TArchiveEntry>;
 
   { TArchiveDir }
-
+  // Dir inside an Archive, can contain more dirs, its recursive
   TArchiveDir = class(TArchiveEntry)
   public
-    Entries: TArchiveDirList;
+    Entries: TArchiveDirList;   // list of all entries, Dirs and files
     constructor Create; virtual;
     destructor Destroy; override;
-    function EntryByName(AName: string): TArchiveEntry;
+    function EntryByName(AName: string): TArchiveEntry; // get an Archive Entry by Name (Not Case Sensitive)
   end;
 
 
   { TArchiveBase }
-
+  // Base class for all types of archive, wraps archive handling
   TArchiveBase = class
   protected
-    FArchiveName: string;
-    function GetIsReadOnly: Boolean; virtual;
+    FArchiveName: string;                     // Name and path of archive
+    function GetIsReadOnly: Boolean; virtual; // This archive type supports writing or not
   public
-    AD: TArchiveDir;
+    AD: TArchiveDir;                          // the listing of the archive
     constructor Create; virtual;
     destructor Destroy; override;
     //
-    function ReadArchive(AFilename: string): Boolean; virtual; abstract;
-    function PackFile(AFileName: string; FilePathInArchive: string): Boolean; virtual; abstract;
-    function ExtractFile(FilePathInArchive: string; DestFilename: string): Boolean; virtual; abstract;
-    function DeleteFile(AFileName: string): Boolean; virtual; abstract;
-    function CreateDir(ADirName: string): Boolean; virtual; abstract;
-    function RenameFile(OldFile: string; NewFile: string): Boolean; virtual; abstract;
-    function RenameDir(OldDir: string; NewDir: string): Boolean; virtual; abstract;
+    function ReadArchive(AFilename: string): Boolean; virtual; abstract;                               // most important function, read contains of the given Archive AFilename (with path)
+    function PackFile(AFileName: string; FilePathInArchive: string): Boolean; virtual; abstract;       // pack AFilename into the archive as FilePathInArchive
+    function ExtractFile(FilePathInArchive: string; DestFilename: string): Boolean; virtual; abstract; // Extract FilePathInArchive to the File DestFilename (With Path)
+    function DeleteFile(AFileName: string): Boolean; virtual; abstract;                                // Delete file inside Archives
+    function CreateDir(ADirName: string): Boolean; virtual; abstract;                                  // Create a Directory inside archive
+    function RenameFile(OldFile: string; NewFile: string): Boolean; virtual; abstract;                 // Rename a file inside archive
+    function RenameDir(OldDir: string; NewDir: string): Boolean; virtual; abstract;                    // Rename a directory inside Archive
     //
-    function RescanArchive: Boolean; virtual;
+    function RescanArchive: Boolean; virtual;     // Changed something in dir, Rescan the listing
     //
-    class function FileIsArchive(AFileName: string): Boolean; virtual;
-    class function IsAvailable: Boolean; virtual; abstract;
-    class function Prio: LongInt; virtual;
+    class function FileIsArchive(AFileName: string): Boolean; virtual;  // Check if the given file can be open with this archive class
+    class function IsAvailable: Boolean; virtual; abstract;             // this class is available (e.g. exe/library available)
+    class function Prio: LongInt; virtual;                              // if some classes want handle the same, the one with higher prio is used
 
-    property ArchiveName: string read FArchiveName;
-    property IsReadOnly: Boolean read GetIsReadOnly;
+    property ArchiveName: string read FArchiveName;    // Name and path of archive
+    property IsReadOnly: Boolean read GetIsReadOnly;   // archive class can write to archives or not
   end;
 
   TArchiveClass = class of TArchiveBase;
 
   { TLHAArchive }
-
+  // Standard Amiga LHA archive
   TLHAArchive = class(TArchiveBase)
   public
     function ReadArchive(AFilename: string): Boolean; override;
@@ -80,10 +82,9 @@ type
   end;
 
   { TLZXArchive }
-
+  // Standard Amiga LZX Archives
   TLZXArchive = class(TArchiveBase)
   public
-
     function ReadArchive(AFilename: string): Boolean; override;
     function PackFile(AFileName: string; FilePathInArchive: string): Boolean; override;
     function ExtractFile(FilePathInArchive: string; DestFilename: string): Boolean; override;
@@ -100,6 +101,7 @@ type
 
 // Search for the archiver class for this archive
 function GetArchiver(AFilename: string): TArchiveClass;
+// register a new archiv class
 procedure RegisterArchiver(ArchiveClass: TArchiveClass);
 
 implementation

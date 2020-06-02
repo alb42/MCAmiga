@@ -32,28 +32,28 @@ Keys:
 Movement:
 ---------
 
-Cursor up, 8         - Move cursor one up 
-Cursor down, 2       - Move cursor one down
-Pg up, 9, Ctrl up    - move cursor 10 up
-Pg dwn, 3, Ctrl down - move cursor 10 down
-Home, 7, Ctrl left   - go to first item
-end, 1, Ctrl right   - go to last item
-Tab                  - change focus to other panel
-Enter                - Enter Directory if cursor on directory or archive
-Shift-Enter          - Open directory or archive on other panel
-Backspace            - go to Parent
-Strg + F1, Alt + F1  - go to drives view on left panel
-Strg + F2, Alt + F2  - go to drives view on right panel
-Ctrl + D, Alt + D    - go to drives view
-Alt + O              - set destination dir to source dir
-Ctrl + S             - type start of name to fast jump to it
+Cursor up, 8             - Move cursor one up 
+Cursor down, 2           - Move cursor one down
+Pg up, 9, Ctrl up        - move cursor 10 up
+Pg dwn, 3, Ctrl down     - move cursor 10 down
+Home, 7, Ctrl left       - go to first item
+end, 1, Ctrl right       - go to last item
+Tab                      - change focus to other panel
+Enter,Cursor Right,6     - Enter Directory if cursor on directory or archive
+Shift-Enter              - Open directory or archive on other panel
+Backspace, Cursor left,4 - go to Parent
+Strg + F1, Alt + F1      - go to drives view on left panel
+Strg + F2, Alt + F2      - go to drives view on right panel
+Ctrl + D, Alt + D        - go to drives view
+Alt + O                  - set destination dir to source dir
+Ctrl + S                 - type start of name to fast jump to it
 
 Selection:
 ----------
 
 INS, 0, Space, # - De-/Select item and move one item down
 Shift Up         - De-/Select item and move one item up
-Shift Up         - De-/Select item and move one item down
+Shift Down       - De-/Select item and move one item down
 +                - Select items by pattern
 -                - Desel items by pattern
 
@@ -97,6 +97,11 @@ DEFAULTSHELL= parameter for to define settings for the tools menu newshell defin
 
 History:
 ########
+
+0.8
+- Bugfix Move from archive
+- lynx type movement
+- Bugfix initial view as drive view
 
 0.7
 - Search function in tools menu
