@@ -824,7 +824,7 @@ begin
   end;
   Key := PollNextKey;
   // Break on Enter -> Cancel
-  if ((Key and $FFFF) = $1C0D) or CancelPressed then
+  if ((Key and $FF) = $0D) or CancelPressed then
     Result := False;
 
 end;
@@ -931,7 +931,7 @@ begin
   end;
   Key := PollNextKey;
   // Break on Enter -> Cancel
-  if ((Key and $FFFF) = $1C0D) or CancelPressed then
+  if ((Key and $FFFF) = $0D) or CancelPressed then
     Result := False;
 end;
 
