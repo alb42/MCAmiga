@@ -8,6 +8,10 @@ if the font is too big try to set the Environment variable FPC_VIDEO_BUILTINFONT
 e.g. echo vga8 >env:FPC_VIDEO_BUILTINFONT
 and restart the program, or create it in Envarc: to make it available as default.
 
+in the c folder is a example startupup script for mc which you can use after booting without startup-seqeuence
+put that file mc to c: adjust the path to MCAmiga at end of script and make it executable with "protect c:mc swerd"
+after booting without startup-sequence simply type "mc"
+
 Requirements:
 #############
 

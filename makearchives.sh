@@ -11,6 +11,8 @@ cp LICENSE Release/MCAmiga
 cp LICENSE.info Release/MCAmiga
 cp Readme.txt Release/MCAmiga
 cp Readme.txt.info Release/MCAmiga
+mkdir Release/MCAmiga/C
+cp mc Release/MCAmiga/C/mc
 
 
 rm -f MCAmiga
