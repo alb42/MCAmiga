@@ -1008,16 +1008,17 @@ begin
         Exit;
       end;
     end;
-    case (Key and $FFFF) of
-      $4B00: begin // cursor left
+    if Key <> 0 then
+    case (TranslateKeyEvent(Key) and $FFFF) of
+      kbdLeft: begin // cursor left
         if CursorX > TxtL then
           SetCursorPos(CursorX - 1, CursorY);
       end;
-      $4D00: begin // cursor right
+      kbdRight: begin // cursor right
         if CursorX < TxtL + Length(NewName) then
           SetCursorPos(CursorX + 1, CursorY);
       end;
-      $1C0D: begin
+      $1C0D, $000D: begin
         Result := ButtonsArray[SelectedButton].Result;
         Break;
       end;
