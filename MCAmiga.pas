@@ -348,6 +348,9 @@ begin
     DefaultShell := GetStrToolType(DObj, 'DEFAULTSHELL', '');
     //
     AutoInfo := GetStrToolType(DObj, 'INFOFILESAUTOHANDLING', '0') = '';
+    //
+    AutoCreateInfo := GetStrToolType(DObj, 'CREATEDIRICON', '0') = '';
+    //
     FreeDiskObject(DObj);
   end;
 end;

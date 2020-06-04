@@ -50,7 +50,7 @@ var
   DefShowMenu: Boolean = False;  // show bottom F-Key menu by default
   FullScreen: Boolean = False;   // Switch to fullscreen
   AutoInfo: Boolean = False;     // do not ask for info action, just do it
-
+  AutoCreateInfo: Boolean = False; // Automatically create icon for new dirs
 
 type
   TEntryType = (etParent, etDir, etFile, etDrive, etAssign); // types of entries in the panel, do not change, sorting depend on it
@@ -1270,6 +1270,7 @@ end;
 procedure TFileList.MakeDir;
 var
   NewName, BasePath: string;
+  DF, SF: TFileStream;
 begin
   if FCurrentPath = '' then
     Exit;
@@ -1290,6 +1291,20 @@ begin
     begin  // create dir
       if not SysUtils.CreateDir(IncludeTrailingPathDelimiter(FCurrentPath) + NewName) then
         ShowMessage('Unable to create dir "' + NewName + '"');
+      if AutoCreateInfo and FileExists('ENVARC:sys/def_drawer.info') and not FileExists(IncludeTrailingPathDelimiter(FCurrentPath) + NewName + '.info') then
+      begin
+        DF := nil;
+        SF := nil;
+        try
+          DF := TFileStream.Create(IncludeTrailingPathDelimiter(FCurrentPath) + NewName + '.info', fmCreate);
+          SF := TFileStream.Create('ENVARC:sys/def_drawer.info', fmOpenRead);
+          DF.CopyFrom(SF, SF.Size);
+        finally
+          SF.Free;
+          DF.Free;
+        end;
+
+      end;
       Update(True);
       ActivateFile(IncludeTrailingPathDelimiter(NewName));
     end;
