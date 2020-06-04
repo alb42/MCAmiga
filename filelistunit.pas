@@ -1063,6 +1063,8 @@ begin
       etParent: GoToParent;
       // ####### File
       etFile: begin
+        if InArchive then // we are in an archive... starting exe not implemented for now
+          Exit;
         // if archive, just enter
         if ToChange.CheckForArchiveEnter(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name) then
         begin
