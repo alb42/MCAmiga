@@ -76,6 +76,7 @@ type
     procedure AddFile(AName: string; Size: Int64); // add file
     procedure AddDir(AName: string);               // add directory
     procedure AddCopy(AEntry: TListEntry);         // make a copy of the given entry and put to list
+    function GetEntryByName(AName: string): Integer;
   end;
 
   // Mouse mode for click and drag (if first one is select, select all on drag)
@@ -153,6 +154,7 @@ type
     procedure EditFile(OpenWithProgram: string = ''); // Edit File with given program
 
     procedure SelectByPattern(DoSelect: Boolean);     // Select entries by pattern (or deselect)
+    procedure SelectInfoFiles;
 
     procedure MouseEvent(Me: TMouseEvent);            // Mouse event (select entries, deselect entries with mouse)
 
@@ -305,6 +307,22 @@ begin
   NEntry := TListEntry.Create;
   NEntry.Assign(AEntry);
   Self.Add(NEntry);
+end;
+
+function TEntryList.GetEntryByName(AName: string): Integer;
+var
+  I: Integer;
+begin
+  Result := -1;
+  AName := ExcludeTrailingPathDelimiter(LowerCase(AName));
+  for i := 0 to Count - 1 do
+  begin
+    if AName = ExcludeTrailingPathDelimiter(LowerCase(Items[i].Name)) then
+    begin
+      Result := i;
+      Break;
+    end;
+  end;
 end;
 
 { TListEntry }
@@ -779,6 +797,8 @@ var
   TempName, BasePath: string;
   Target: string;
   PG: TSingleProgress;
+  Res: TDialogResult;
+  NTxt: string;
 begin
   if OtherSide.InArchive then
   begin
@@ -797,6 +817,7 @@ begin
   BasePath := IncludeTrailingPathDelimiter(Copy(FCurrentPath, Pos(#10, FCurrentPath) + 2, Length(FCurrentPath)));
   FL := TEntryList.Create(True);
   PG := nil;
+  Res := mrNone;
   try
     DoListOfSelectedFile(True, FL, Dirs, Files, Size);
     if FL.Count > 0 then
@@ -819,6 +840,24 @@ begin
             CreateDir(ExcludeTrailingPathDelimiter(IncludeTrailingPathDelimiter(Target) + SrcName));
           if FL[i].EType = etFile then
           begin
+            if FileExists(IncludeTrailingPathDelimiter(OtherSide.CurrentPath) + FL[i].Name) then
+            begin
+              if Res = mrNone then
+              begin
+                NTxt := '     New:      ' + '                       ' + IntToStr(FL[i].Size) + ' bytes'#13#10;
+                Res := AskMultipleQuestion('File "' + FL[i].Name +'" already exists, Overwrite?'#13#10 + NTxt + OverwriteText('', IncludeTrailingPathDelimiter(Target) + FL[i].Name));
+                PG.Paint;
+              end;
+              case Res of
+                mrOK: begin Res := mrNone; end;
+                mrCancel: begin Res := mrNone; Continue; end;
+                mrAll: ;
+                mrNoAll: Continue;
+                mrAbort: Exit;
+                else
+                  ;
+              end;
+            end;
             FArchive.ExtractFile(BasePath + FL[i].Name, IncludeTrailingPathDelimiter(OtherSide.CurrentPath) + FL[i].Name);
             if AsMove then
               FArchive.DeleteFile(BasePath + FL[i].Name);
@@ -1505,10 +1544,23 @@ begin
               FArchive.RenameDir(BasePath + OldName, BasePath + NewName)
             else
               FArchive.RenameFile(BasePath + OldName, BasePath + NewName);
+            //
+            if FFileList.GetEntryByName(OldName + '.info') >= 0 then
+            begin
+              if AskQuestion('Renamed file has an icon, rename that as well?'#13#10 + '  ' + OldName + '.info -> ' + NewName + '.info') then
+                FArchive.RenameFile(BasePath + ExcludeTrailingPathDelimiter(OldName) + '.info', BasePath + ExcludeTrailingPathDelimiter(NewName) + '.info');
+            end;
             FArchive.RescanArchive;
           end
           else
+          begin
             SysUtils.RenameFile(IncludeTrailingPathDelimiter(FCurrentPath) + OldName, IncludeTrailingPathDelimiter(FCurrentPath) + NewName);
+            if FileExists(IncludeTrailingPathDelimiter(FCurrentPath) + OldName + '.info') then
+            begin
+              if AskQuestion('Renamed file has an icon, rename that as well?'#13#10 + '  ' + OldName + '.info -> ' + NewName + '.info') then
+                SysUtils.RenameFile(IncludeTrailingPathDelimiter(FCurrentPath) + OldName + '.info', IncludeTrailingPathDelimiter(FCurrentPath) + NewName + '.info');
+            end;
+          end;
         end;
         Update(True);
       end
@@ -1796,6 +1848,31 @@ begin
   OtherSide.Update(False);
 end;
 
+procedure TFileList.SelectInfoFiles;
+var
+  ToSelected: array of LongWord;
+  i, Idx, Idx2: LongInt;
+begin
+  SetLength(ToSelected, 0);
+  for i := 0 to FFileList.Count - 1 do
+  begin
+    if FFileList[i].Selected then
+    begin
+      Idx := FFileList.GetEntryByName(ExcludeTrailingPathDelimiter(FFileList[i].Name) + '.info');
+      if Idx >= 0 then
+      begin
+        Idx2 := Length(ToSelected);
+        SetLength(ToSelected, Idx2 + 1);
+        ToSelected[Idx2] := Idx;
+      end;
+    end;
+  end;
+  //
+  for i := 0 to High(ToSelected) do
+    FFileList[ToSelected[i]].Selected := True;
+  Update(False);
+end;
+
 procedure TFileList.MouseEvent(Me: TMouseEvent);
 var
   l: Integer;
@@ -1847,40 +1924,6 @@ begin
       end;
     MouseActionUp: FMouseSelMode := msNone;
   end;
-end;
-
-function GetFileSize(const Name: string): Int64;
-var
-  SRec: TSearchRec;
-begin
-  if FindFirst(name, faAnyfile, SRec) = 0 then
-  begin
-    Result := SRec.Size;
-    FindClose(SRec);
-  end
-  else
-    Result := 0;
-end;
-
-function OverwriteText(Src, dest: string): string;
-var
-  fileDate: Int64;
-begin
-  Result := '     New:      ';
-  fileDate := FileAge(Src);
-  if fileDate > -1 then
-    Result := Result + FormatDateTime('YYYY-MM-DD hh:nn:ss', FileDateToDateTime(fileDate))
-  else
-    Result := '               ';
-  Result := Result + '    ' + IntToStr(GetFileSize(Src)) + ' bytes     '#13#10;
-
-  Result := Result + '     Existing: ';
-  fileDate := FileAge(dest);
-  if fileDate > -1 then
-    Result := Result + FormatDateTime('YYYY-MM-DD hh:nn:ss', FileDateToDateTime(fileDate))
-  else
-    Result := '               ';
-  Result := Result + '    ' + IntToStr(GetFileSize(dest)) + ' bytes     '#13#10;
 end;
 
 //############ Copy

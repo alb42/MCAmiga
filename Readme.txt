@@ -102,6 +102,10 @@ History:
 - Bugfix Move from archive
 - lynx type movement
 - Bugfix initial view as drive view
+- Bugfix overwrite requester when extracting files
+- Bugfix crash on double click on file in archive
+- Ask to rename the icon together with the file
+- Tool entry to select all info files of selected files
 
 0.7
 - Search function in tools menu

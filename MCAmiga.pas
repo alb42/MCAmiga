@@ -10,7 +10,7 @@ uses
   {$if defined(Amiga68k) or defined(MorphOS) or defined(AROS)}
   xad, xadarchive,
   {$endif}
-  FileListUnit, dialogunit, EventUnit, archiveunit, searchunit;
+  FileListUnit, dialogunit, EventUnit, archiveunit;
 
 var
   Src: TFileList;

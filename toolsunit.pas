@@ -11,6 +11,8 @@ procedure CreateAllDir(AName: string);
 // Recursively Delete a complete Temp directory (contents and directory)
 procedure DeleteAll(TempName: string);
 
+function OverwriteText(Src, dest: string): string;
+
 implementation
 
 procedure CreateAllDir(AName: string);
@@ -51,6 +53,52 @@ begin
     FindClose(FindInfo);
   end;
   DeleteFile(Tempname);
+end;
+
+function GetFileSize(const Name: string): Int64;
+var
+  SRec: TSearchRec;
+begin
+  if FindFirst(name, faAnyfile, SRec) = 0 then
+  begin
+    Result := SRec.Size;
+    FindClose(SRec);
+  end
+  else
+    Result := -1;
+end;
+
+function OverwriteText(Src, dest: string): string;
+var
+  fileDate: Int64;
+  Size: Int64;
+begin
+  Result := '';
+  if Src <> '' then
+  begin
+    Result := '     New:      ';
+    fileDate := FileAge(Src);
+    if fileDate > -1 then
+      Result := Result + FormatDateTime('YYYY-MM-DD hh:nn:ss', FileDateToDateTime(fileDate))
+    else
+      Result := '               ';
+    Size := GetFileSize(Src);
+    if Size >= 0 then
+      Result := Result + '    ' + IntToStr(Size) + ' bytes     '#13#10
+    else
+      Result := '';
+  end;
+
+  if dest <> '' then
+  begin
+    Result := Result + '     Existing: ';
+    fileDate := FileAge(dest);
+    if fileDate > -1 then
+      Result := Result + FormatDateTime('YYYY-MM-DD hh:nn:ss', FileDateToDateTime(fileDate))
+    else
+      Result := '               ';
+    Result := Result + '    ' + IntToStr(GetFileSize(dest)) + ' bytes     '#13#10;
+  end;
 end;
 
 end.

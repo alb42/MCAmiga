@@ -171,6 +171,7 @@ type
     procedure StartProgEvent;  // start a program with the current file as argument
     procedure UnpackArchive;   // Unpack current archive to dest
     procedure SearchStart;     // open the search requester
+    procedure SelectInfo;
   protected
     procedure ProcessMouse(MouseEvent: TMouseEvent); override;
     procedure DrawButtons; override;
@@ -533,6 +534,11 @@ begin
   StartSearch(SrcP);
 end;
 
+procedure TToolsMenu.SelectInfo;
+begin
+  SrcP.SelectInfoFiles;
+end;
+
 procedure TToolsMenu.ProcessMouse(MouseEvent: TMouseEvent);
 var
   NEntry: Integer;
@@ -596,6 +602,7 @@ begin
   AddToolsEntry('Open file in external program', @StartProgEvent);
   AddToolsEntry('Extract archive contents', @UnpackArchive);
   AddToolsEntry('Find Files', @SearchStart);
+  AddToolsEntry('Select Icons of selected files', @SelectInfo);
 end;
 
 function TToolsMenu.Execute: TDialogResult;

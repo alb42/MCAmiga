@@ -5,7 +5,7 @@ unit searchunit;
 interface
 
 uses
-  Exec, AmigaDOS, Utility,
+  AmigaDOS, Utility,
   Classes, SysUtils, FileListUnit, Video, KeyBoard, Mouse, dialogunit, Math, SyncObjs, contnrs;
 
 procedure StartSearch(ASrcPanel: TFileList);
@@ -542,7 +542,7 @@ var
   i: Integer;
   CmpBuffer: PChar;
   TestBuffer: PChar;
-  Len: Integer;
+  Len: LongWord;
   Pat: string;
   Sr: TSearchResult;
 begin
@@ -642,7 +642,7 @@ function TSearchResults.GetItem(Idx: LongWord): TSearchResult;
 begin
   Result := nil;
   ResLock.Enter;
-  if Idx < FResults.Count then
+  if Idx < LongWord(FResults.Count) then
     Result := TSearchResult(FResults[Idx]);
   ResLock.Leave;
 end;
