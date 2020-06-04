@@ -347,6 +347,7 @@ begin
     // Default Shell settings (CON:....)
     DefaultShell := GetStrToolType(DObj, 'DEFAULTSHELL', '');
     //
+    AutoInfo := GetStrToolType(DObj, 'INFOFILESAUTOHANDLING', '0') = '';
     FreeDiskObject(DObj);
   end;
 end;

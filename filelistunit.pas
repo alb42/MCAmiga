@@ -49,6 +49,7 @@ var
   WithDevices: Boolean = False;  // show all devices in device list (or only show volumes and assigns)
   DefShowMenu: Boolean = False;  // show bottom F-Key menu by default
   FullScreen: Boolean = False;   // Switch to fullscreen
+  AutoInfo: Boolean = False;     // do not ask for info action, just do it
 
 
 type
@@ -1386,6 +1387,8 @@ var
   i: Integer;
   Found: Boolean;
 begin
+  if AutoInfo then
+    SelectInfoFiles;
   CountPG := TSingleProgress.Create;
   CountPG.Text := 'Counting Files';
   CountPG.MaxValue := FFileList.Count;
@@ -1427,11 +1430,31 @@ begin
       FL.AddFile(FFileList[FActiveElement].Name, FFileList[FActiveElement].Size);
       Inc(Files);
       Size := Size + FFileList[FActiveElement].Size;
+      if AutoInfo then
+      begin
+        i := FFileList.GetEntryByName(FFileList[FActiveElement].Name + '.info');
+        if i >= 0 then
+        begin
+          FL.AddFile(FFileList[i].Name, FFileList[i].Size);
+          Inc(Files);
+          Size := Size + FFileList[i].Size;
+        end;
+      end;
     end;
     if FFileList[FActiveElement].EType = etDir then
     begin
       FL.AddDir(FFileList[FActiveElement].Name);
       Inc(Dirs);
+      if AutoInfo then
+      begin
+        i := FFileList.GetEntryByName(ExcludeTrailingPathDelimiter(FFileList[FActiveElement].Name) + '.info');
+        if i >= 0 then
+        begin
+          FL.AddFile(FFileList[i].Name, FFileList[i].Size);
+          Inc(Files);
+          Size := Size + FFileList[i].Size;
+        end;
+      end;
       if Recursive then
       begin
         if InArchive then
@@ -1574,7 +1597,7 @@ begin
             SysUtils.RenameFile(IncludeTrailingPathDelimiter(FCurrentPath) + OldName, IncludeTrailingPathDelimiter(FCurrentPath) + NewName);
             if FileExists(IncludeTrailingPathDelimiter(FCurrentPath) + OldName + '.info') then
             begin
-              if AskQuestion('Renamed file has an icon, rename that as well?'#13#10 + '  ' + OldName + '.info -> ' + NewName + '.info') then
+              if AutoInfo or AskQuestion('Renamed file has an icon, rename that as well?'#13#10 + '  ' + OldName + '.info -> ' + NewName + '.info') then
                 SysUtils.RenameFile(IncludeTrailingPathDelimiter(FCurrentPath) + OldName + '.info', IncludeTrailingPathDelimiter(FCurrentPath) + NewName + '.info');
             end;
           end;

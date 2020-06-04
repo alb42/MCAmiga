@@ -95,6 +95,8 @@ SHOWMENU  if this ToolType is present the Bottom menu is shown by program start
 
 DEFAULTSHELL= parameter for to define settings for the tools menu newshell define console size, name and parameter
 
+INFOFILESAUTOHANDLING if this tool type is given, it will automatically move, rename, delete the icon with the main file, if tooltype is not given it will ask on Rename, in tools menu you can select the info files for the currently selected files
+
 History:
 ########
 
