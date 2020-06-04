@@ -172,6 +172,7 @@ type
   procedure SetChar(x,y: Integer; c: Char); overload;
   // write a Text to the Video screen at x,y in x direction
   procedure SetText(x,y: Integer; s: string);
+  procedure SetTextA(x,y: Integer; s: string);
   // cut the filename to fit into MaxLength, replace the cutted text with '...', when Pathmode, let the start of path stay
   function LimitName(AName: string; MaxLength: Integer; PathMode: Boolean = False): string;
   // get a temp file name
@@ -275,6 +276,22 @@ var
 begin
   for i := 1 to Length(s) do
     SetChar(x + i - 1, y, s[i]);
+end;
+
+// Set Text by coord, will just continue to write in x direction,
+// does not check for end of line, and just continue on the next line
+// it converts the text to the right encoding
+procedure SetTextA(x,y: Integer; s: string);
+var
+  i: Integer;
+  c: Char;
+begin
+  for i := 1 to Length(s) do
+  begin
+    c := s[i];
+    ConvertChar(c);
+    SetChar(x + i - 1, y, c);
+  end;
 end;
 
 { TEntryList }
@@ -415,14 +432,14 @@ begin
   s := LimitName(StringReplace(FCurrentPath, #10, ':', [rfReplaceAll]) , FRect.Width - 5, True);
   if IsActive then
   begin
-    SetText(FRect.Left + 2, FRect.Top, LeftEdge);
-    SetText(FRect.Left + 3 + Length(s) , FRect.Top, RightEdge);
+    SetChar(FRect.Left + 2, FRect.Top, LeftEdge);
+    SetChar(FRect.Left + 3 + Length(s) , FRect.Top, RightEdge);
     FGPen := Blue;
     BGPen := LightGray;
-    SetText(FRect.Left + 3, FRect.Top, s);
+    SetTextA(FRect.Left + 3, FRect.Top, s);
   end
   else
-    SetText(FRect.Left + 2, FRect.Top, LeftEdge + s + RightEdge);
+    SetTextA(FRect.Left + 2, FRect.Top, LeftEdge + s + RightEdge);
   // count selected files and count bytes and draw below the contents
   CheckSelected;
   // redraw the menu if needed, always the current panel draws also the bottom menu
@@ -430,7 +447,7 @@ begin
     DrawMenu;
   // Draw screen flip button in the upper right edge
   if FullScreen and IsActive then
-    SetText(ScreenWidth - 3, 0, LeftEdge + #8 + RightEdge);
+    SetTextA(ScreenWidth - 3, 0, LeftEdge + #8 + RightEdge);
 end;
 
 const  // Menu names for the bottom F-Key F1-F0
@@ -700,7 +717,7 @@ begin
       s := Copy(s, 1 + ActShowStart, FInnerRect.Width);
       l := Length(s);
     end;
-    SetText(FInnerRect.Left, FRect.Bottom - 1, s);
+    SetTextA(FInnerRect.Left, FRect.Bottom - 1, s);
   end;
   for n := 0 to FInnerRect.Width - l do
     SetChar(FInnerRect.Left + l + n, FRect.Bottom - 1, ' ');
@@ -755,7 +772,7 @@ begin
     // limit the name, it's not a path, and write to video
     s := LimitName(FFileList[Idx].Name, FInnerRect.Width - 9);
     l := Length(s);
-    SetText(FInnerRect.Left, FInnerRect.Top + Idx - FTopElement, s);
+    SetTextA(FInnerRect.Left, FInnerRect.Top + Idx - FTopElement, s);
     // fill the rest with spaces
     for n := 0 to FInnerRect.Width - l do
       SetChar(FInnerRect.Left + l + n, FInnerRect.Top + Idx - FTopElement, ' ');
@@ -1709,7 +1726,7 @@ begin
           for i := FInnerRect.Left to FInnerRect.Right do
             SetChar(i, FRect.Bottom - 1, ' ');
           SetCursorPos(FInnerRect.Left + Length(NSearchName), FRect.Bottom - 1);
-          SetText(FinnerRect.Left, FRect.Bottom - 1, NSearchName);
+          SetTextA(FinnerRect.Left, FRect.Bottom - 1, NSearchName);
           UpdateScreen(False);
         end;
       end;

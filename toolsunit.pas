@@ -13,7 +13,38 @@ procedure DeleteAll(TempName: string);
 
 function OverwriteText(Src, dest: string): string;
 
+procedure ConvertChar(var c: Char); inline;
+procedure ConvertCharBack(var c: Char); inline;
+
 implementation
+
+procedure ConvertChar(var c: Char); inline;
+begin
+  case c of
+    #$C7: c := #128; // C
+    #$FC: c := #129; // ue
+    #$DC: c := #154; // UE
+    #$E4: c := #132; // ae
+    #$C4: c := #142; // AE
+    #$F6: c := #148; // oe
+    #$D6: c := #153; // OE
+    #$DF: c := #225; // sz
+  end;
+end;
+
+procedure ConvertCharBack(var c: Char); inline;
+begin
+  case c of
+    #128: c := #$C7; // C
+    #129: c := #$FC; // ue
+    #154: c := #$DC; // UE
+    #132: c := #$E4; // ae
+    #142: c := #$C4; // AE
+    #148: c := #$F6; // oe
+    #153: c := #$D6; // OE
+    #225: c := #$DF; // sz
+  end;
+end;
 
 procedure CreateAllDir(AName: string);
 var

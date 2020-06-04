@@ -9,8 +9,8 @@ uses
   Types, Classes, SysUtils, Video, Keyboard, Mouse, Math, EventUnit;
 
 const
-  NumVERSION = '0.7';
-  VERSION = '$VER: MCAmiga 0.7 (01.06.2020)';
+  NumVERSION = '0.8';
+  VERSION = '$VER: MCAmiga 0.8 (04.06.2020)';
 
 type
                 //yes     no,    yes to All    No to all      Abort   None
@@ -237,7 +237,7 @@ var
 implementation
 
 uses
-  ArchiveUnit, searchunit;
+  ArchiveUnit, searchunit, ToolsUnit;
 
 // Help text for the main application! MaxLength 70
 const       //.........1.........2.........3.........4.........5........6.........7.........8
@@ -589,7 +589,7 @@ begin
 
     s := IntToStr(i + 1) + '    ' + Tools[i].AName;
     s := s + Space(Max(0, InnerRect.Width - AbsLen - 1));
-    SetText(InnerRect.Left + 2, InnerRect.Top + i, s);
+    SetTextA(InnerRect.Left + 2, InnerRect.Top + i, s);
   end;
   UpdateScreen(False);
 end;
@@ -742,7 +742,7 @@ begin
   FGPen := Black;
   DrawWindowBorder;
 
-  SetText(Mid.X - Length(Text) div 2, Mid.Y - 1, Text);
+  SetTextA(Mid.X - Length(Text) div 2, Mid.Y - 1, Text);
 
   PGL := WindowRect.Left + 2;
   PGR := WindowRect.Right - 2;
@@ -815,7 +815,7 @@ begin
       end;
       Text := LimitName(Text, w - 10, False);
       p := w div 2 - Length(Text) div 2 + 5;
-      SetText(p, Pup - 2, Text);
+      SetTextA(p, Pup - 2, Text);
     end;
     if Text2 <> '' then
     begin
@@ -825,7 +825,7 @@ begin
       end;
       Text2 := LimitName(Text2, w - 10, False);
       p := (PGR - 2) - Length(Text2);
-      SetText(p, Pup, Text2);
+      SetTextA(p, Pup, Text2);
     end;
     UpdateScreen(False);
   end;
@@ -859,7 +859,7 @@ begin
   FGPen := Black;
   DrawWindowBorder;
 
-  SetText(Mid.X - Length(Text) div 2, Mid.Y - 1, Text);
+  SetTextA(Mid.X - Length(Text) div 2, Mid.Y - 1, Text);
 
   PGL := WindowRect.Left + 2;
   PGR := WindowRect.Right - 2;
@@ -932,7 +932,7 @@ begin
       end;
       Text := LimitName(Text, w - 10, False);
       p := w div 2 - Length(Text) div 2;
-      SetText(p, Pup - 1, Text);
+      SetTextA(p, Pup - 1, Text);
     end;
     UpdateScreen(False);
   end;
@@ -946,9 +946,9 @@ end;
 
 function TAskForName.IsValidChar(c: Char): Boolean;
 begin
-  Result := c in ['a'..'z','A'..'Z','-','.','_','0'..'9',' '];
-  if not AsName and (InRange(Ord(c), 26, 126)) then
-    Result := True;
+  Result := InRange(Ord(c), 26, 126) or (c in [#$C7, #$FC, #$DC, #$E4, #$C4, #$F6, #$D6, #$DF]);
+  if AsName and Result then
+    Result := not (c in [':', '?', '#', '*', '\', '"', '''', '|', '>', '<']);
 end;
 
 function TAskForName.ValidInput(s: string): Boolean;
@@ -973,7 +973,7 @@ begin
   FGPen := Black;
   DrawWindowBorder;
 
-  SetText(Mid.X - l, Mid.Y - 1, Text);
+  SetTextA(Mid.X - l, Mid.Y - 1, Text);
 
   TxtL := WindowRect.Left + 2;
   TxtR := WindowRect.Right - 2;
@@ -987,7 +987,7 @@ begin
 
   SetCursorType(crUnderline);
   SetCursorPos(TxtL + Length(NewName), Mid.Y);
-  SetText(TxtL, Mid.y, Newname);
+  SetTextA(TxtL, Mid.y, Newname);
 
   // draw Buttons
   FGPen := Black;
@@ -1043,7 +1043,8 @@ begin
       begin
         c := GetKeyEventChar(Key);
         case c of
-          #32..#126: begin
+          #32..#252: begin
+            ConvertCharBack(c);
             if IsValidChar(c) then
             begin
               p := CursorX - TxtL;
@@ -1056,7 +1057,7 @@ begin
                   NewName := OldName;
                   BGPen := Black;
                   FGPen := LightGray;
-                  SetText(TxtL, Mid.y, Newname);
+                  SetTextA(TxtL, Mid.y, Newname);
                   SetCursorPos(CursorX + 1, Mid.Y);
                   UpdateScreen(False);
                 end;
@@ -1070,7 +1071,7 @@ begin
               Delete(NewName, p, 1);
               BGPen := Black;
               FGPen := LightGray;
-              SetText(TxtL, Mid.y, Newname);
+              SetTextA(TxtL, Mid.y, Newname);
               SetChar(TxtL + Length(NewName), Mid.y, ' ');
               SetCursorPos(CursorX - 1, Mid.Y);
               UpdateScreen(False);
@@ -1170,7 +1171,7 @@ begin
       BGPen := Cyan
     else
       BGPen := LightGray;
-    SetText(ButtonsArray[i].Rect.Left, ButtonsArray[i].Rect.Top, LBorder + ButtonsArray[i].Title + RBorder);
+    SetTextA(ButtonsArray[i].Rect.Left, ButtonsArray[i].Rect.Top, LBorder + ButtonsArray[i].Title + RBorder);
   end;
   BGPen := LightGray;
   UpdateScreen(False);
@@ -1246,7 +1247,7 @@ begin
   for i := TopLine to SL.Count - 1 do
   begin
     if InnerRect.Top + 1 + j < ScreenHeight - 3 then
-      SetText(InnerRect.left + 1, InnerRect.Top + 1 + j, SL[i]);
+      SetTextA(InnerRect.left + 1, InnerRect.Top + 1 + j, SL[i]);
     j := j + 1;
   end;
   SL.Free;

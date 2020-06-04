@@ -256,7 +256,7 @@ begin
     //
     if InnerRect.Top + p > InnerRect.Bottom - 2 then
       Break;
-    SetText(InnerRect.Left, InnerRect.Top + p, OutS[i]);
+    SetTextA(InnerRect.Left, InnerRect.Top + p, OutS[i]);
     Inc(p);
   end;
   BGPen := LightGray;
@@ -489,7 +489,7 @@ begin
           if sc.ContentsPattern = '' then
           begin
             Sr := TSearchResult.Create;
-            Sr.Name := IncludeLeadingPathDelimiter(CurDir + Info.Name);
+            Sr.Name := IncludeTrailingPathDelimiter(CurDir + Info.Name);
             SResults.AddResult(Sr);
           end;
         end
@@ -783,7 +783,7 @@ begin
   end;
   c := GetKeyEventChar(Key);
   case c of
-    #32..#126: begin
+    #32..#126, #$C7, #$FC, #$DC, #$E4, #$C4, #$F6, #$D6, #$DF: begin
       if (CurPos >= 0) and (Length(s) < 60) then
       begin
         Inc(CurPos);
@@ -844,7 +844,7 @@ begin
   //
   for i := InnerRect.Left to InnerRect.Right do
     SetChar(i, InnerRect.Top + 1, ' ');
-  SetText(InnerRect.Left, InnerRect.Top + 1, Place);
+  SetTextA(InnerRect.Left, InnerRect.Top + 1, Place);
 
   if ActiveBox = 0 then
   begin
@@ -862,7 +862,7 @@ begin
   //
   for i := InnerRect.Left to Mid.x - 1 do
     SetChar(i, InnerRect.Top + 3, ' ');
-  SetText(InnerRect.Left, InnerRect.Top + 3, FilePattern);
+  SetTextA(InnerRect.Left, InnerRect.Top + 3, FilePattern);
 
   if ActiveBox = 1 then
   begin
@@ -879,7 +879,7 @@ begin
   //
   for i := Mid.X + 1 to InnerRect.Right do
     SetChar(i, InnerRect.Top + 3, ' ');
-  SetText(Mid.X + 1, InnerRect.Top + 3, ContentsPattern);
+  SetTextA(Mid.X + 1, InnerRect.Top + 3, ContentsPattern);
 
   if ActiveBox = 2 then
   begin

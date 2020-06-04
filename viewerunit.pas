@@ -16,7 +16,7 @@ procedure FileViewer(AFileName: string; ASearch: string = ''; Posi: LongInt = -1
 implementation
 
 uses
-  FileListUnit, DialogUnit;
+  FileListUnit, DialogUnit, toolsunit;
 
 type
   TViewerMode = (vmText, vmHex);
@@ -162,20 +162,6 @@ begin
   end;
 end;
 
-procedure ConvertChar(var c: Char); inline;
-begin
-  case c of
-    #$C7: c := #128; // C
-    #$FC: c := #129; // ue
-    #$DC: c := #154; // UE
-    #$E4: c := #132; // ae
-    #$C4: c := #142; // AE
-    #$F6: c := #148; // oe
-    #$D6: c := #153; // OE
-    #$DF: c := #225; // sz
-  end;
-end;
-
 procedure ConvertText(var s: string);
 var
   i: Integer;
@@ -292,7 +278,7 @@ begin
     SetChar(i, 0, ' ');
   end;
 
-  SetText(0, 0, ExtractFileName(FileName));
+  SetTextA(0, 0, ExtractFileName(FileName));
 
   if ShowMenu then
     EndScreen := ScreenHeight - 3
@@ -316,25 +302,24 @@ begin
           BGPen := Blue;
           SetChar(j, i + 1, MemLine[j]);
         end;}
-        ConvertText(s);
         l := Length(s);
         if InRange(i + StartLine, FromSel.Y, ToSel.Y) then
         begin
           s1 := s;
           s2 := Copy(s1, 1, FromSel.X - 1);
           l1 := Length(s2);
-          SetText(0, i + 1, s2);
+          SetTextA(0, i + 1, s2);
           BGPen := Cyan;
           s2 := Copy(s1, FromSel.X, ToSel.X - FromSel.X);
           Delete(s1, 1, ToSel.X - 1);
-          SetText(l1, i + 1, s2);
+          SetTextA(l1, i + 1, s2);
           l1 := l1 + Length(s2);
           BGPen := Blue;
-          SetText(l1, i + 1, s1);
+          SetTextA(l1, i + 1, s1);
         end
         else
         begin
-          SetText(0, i + 1, s);
+          SetTextA(0, i + 1, s);
         end;
       end
       else

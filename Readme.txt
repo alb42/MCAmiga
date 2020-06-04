@@ -106,6 +106,7 @@ History:
 - Bugfix crash on double click on file in archive
 - Ask to rename the icon together with the file
 - Tool entry to select all info files of selected files
+- Better support for german umlauts
 
 0.7
 - Search function in tools menu
