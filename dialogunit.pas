@@ -10,7 +10,7 @@ uses
 
 const
   NumVERSION = '0.8';
-  VERSION = '$VER: MCAmiga 0.8 (04.06.2020)';
+  VERSION = '$VER: MCAmiga 0.8 (05.06.2020)';
 
 type
                 //yes     no,    yes to All    No to all      Abort   None
