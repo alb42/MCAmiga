@@ -3,9 +3,6 @@ program MCAmiga;
 uses
   ATHreads,
   workbench, icon, AppWindowUnit, Intuition,
-  {$ifdef RELEASE}
-  Versioncheck,
-  {$endif}
   Types, SysUtils, Video, mouse, keyboard,
   {$if defined(Amiga68k) or defined(MorphOS) or defined(AROS)}
   xad, xadarchive,
@@ -415,9 +412,6 @@ begin
   Right.ActiveElement := 0;
   Left.IsActive := True;
 
-  {$ifdef RELEASE}
-  CreateVersion;
-  {$endif}
   // Activate the App Window
   MakeAppWindow;
   // run the main event cycle
@@ -430,9 +424,6 @@ begin
 end;
 
 begin
-  {$ifdef RELEASE}
-  DoVersionInformation;
-  {$endif}
   InitVideo;
   InitMouse;
   InitKeyboard;
