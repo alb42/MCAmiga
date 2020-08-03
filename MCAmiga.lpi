@@ -63,10 +63,6 @@
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="versioncheck.pas"/>
-        <IsPartOfProject Value="True"/>
-      </Unit>
-      <Unit>
         <Filename Value="archiveunit.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>

@@ -12,10 +12,8 @@ uses
 
 type
   TArchiveType = (atLHA, atLZX);
-const
-  // Magic of Amiga exe (first 4 bytes), check before start
-  AmigaExecMagic = $03F3;
 
+const
   // Archive settings for packing in tools menu
   ArchiveCmd: array[TArchiveType] of string = ('c:lha -r -x1', 'c:lzx -r -x1');
   ArchiveName: array[TArchiveType] of string = ('LHA', 'LZX');
@@ -51,6 +49,7 @@ var
   FullScreen: Boolean = False;   // Switch to fullscreen
   AutoInfo: Boolean = False;     // do not ask for info action, just do it
   AutoCreateInfo: Boolean = False; // Automatically create icon for new dirs
+  ShowClock: Boolean = True;
 
 type
   TEntryType = (etParent, etDir, etFile, etDrive, etAssign); // types of entries in the panel, do not change, sorting depend on it
@@ -107,6 +106,7 @@ type
     procedure SetCurrentPath(AValue: string);
     procedure DrawBorder;                         // Draw border of panel
     procedure DrawMenu;                           // draw bottom F-Key menus
+    procedure DrawClock;                          // Draw Clock in lower right corner
     procedure DrawContents(UpdateList: Boolean);  // Draw the contents, and also load the directory
     procedure SetIsActive(AValue: Boolean);
     procedure DrawActive(NActive: Integer);       // Draw Active element (NActive = Index in FFileList)
@@ -399,6 +399,7 @@ procedure TFileList.DrawBorder;
 var
   i: Integer;
   s: String;
+  MaxLen: LongInt;
 begin
   // atm fixed colors
   FGPen := LightGray;
@@ -430,7 +431,12 @@ begin
     end;
   end;
   // Create the name for top view, replace the #10 in archives by ':' like mc
-  s := LimitName(StringReplace(FCurrentPath, #10, ':', [rfReplaceAll]) , FRect.Width - 5, True);
+  MaxLen := FRect.Width - 5;
+  if FullScreen then
+    MaxLen := MaxLen - 3;
+  if ShowClock then
+    MaxLen := MaxLen - 5;
+  s := LimitName(StringReplace(FCurrentPath, #10, ':', [rfReplaceAll]), MaxLen, True);
   if IsActive then
   begin
     SetChar(FRect.Left + 2, FRect.Top, LeftEdge);
@@ -445,10 +451,16 @@ begin
   CheckSelected;
   // redraw the menu if needed, always the current panel draws also the bottom menu
   if DefShowMenu and IsActive then
-    DrawMenu;
+    DrawMenu
+  else
+    DrawClock;
   // Draw screen flip button in the upper right edge
-  if FullScreen and IsActive then
-    SetTextA(ScreenWidth - 3, 0, LeftEdge + #8 + RightEdge);
+  if FullScreen and (FRect.Left > 0) then
+  begin
+    BGPen := Blue;
+    FGPen := LightGray;
+    SetTextA(ScreenWidth - 3, 0, LeftEdge + #8 + VertLine);
+  end;
 end;
 
 const  // Menu names for the bottom F-Key F1-F0
@@ -484,6 +496,27 @@ begin
     BGPen := Cyan;
     FGPen := Black;
     SetText(x,y, s);
+  end;
+  DrawClock;
+end;
+
+procedure TFileList.DrawClock;
+var
+  s: string;
+begin
+  if ShowClock then
+  begin
+    FGPen := LightGray;
+    if DefShowMenu then
+      BGPen := Black
+    else
+      BGPen := Blue;
+    s := FormatDateTime('hh:mm', Now());
+    if FullScreen then
+      SetText((ScreenWidth - Length(s) - 3), 0, s)
+    else
+      SetText((ScreenWidth - Length(s)), 0, s);
+    UpdateScreen(False);
   end;
 end;
 
@@ -1089,8 +1122,6 @@ end;
 procedure TFileList.EnterPressed(WithShiftPressed: Boolean; AllowExec: Boolean = True);
 var
   s, Params: string;
-  FS: TFileStream;
-  Magic: LongWord;
   Ret: LongInt;
   ToChange: TFileList;
   cmd: string;
@@ -1131,47 +1162,38 @@ begin
         end;
         if not AllowExec then
           Exit;
-        try
-          // check if we are an Executable, if we have more of this, separate in a new routine to check magics
-          FS := TFileStream.Create(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name, fmOpenRead);
-          Magic := 0;
-          FS.Read(Magic, SizeOf(LongWord));
-          FS.Free;
-          FS := nil;
-          if Magic = AmigaExecMagic then // we are an exe, start it
-          begin
-            Params := '';
-            try
-              if AskForName('Parameter:', Params, False) then  // ask user for parameter for that exe
-              begin
-                NonWaitMessage('Starting ' + FFileList[FActiveElement].Name);
-                // form command line, shift -> start with run, unblocking
-                cmd := '"' + IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name + '" ' + Params;
-                if WithShiftPressed then
-                  cmd := 'c:run ' + cmd;
-                // Full Screen, bring WB to Front
-                if FullScreen then
-                  WBenchToFront;
-                // do it
-                Ret := SystemTags(PChar(cmd), [TAG_END]);
-                if Ret <> 0 then
-                  ShowMessage(FFileList[FActiveElement].Name + ' returned with error message: ' + IntToStr(Ret));
-                // wait a bit and remove message
-                if WithShiftPressed then
-                  Sleep(250);
-                // fullscreen -> jump back
-                if FullScreen and not WithShiftPressed then
-                   ScreenToFront(VideoWindow^.WScreen);
-              end;
-            except
-              ;
+        // check if we are an Executable, if we have more of this, separate in a new routine to check magics
+        if IsExecutable(IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name) then // we are an exe, start it
+        begin
+          Params := '';
+          try
+            if AskForName('Parameter:', Params, False) then  // ask user for parameter for that exe
+            begin
+              NonWaitMessage('Starting ' + FFileList[FActiveElement].Name);
+              // form command line, shift -> start with run, unblocking
+              cmd := '"' + IncludeTrailingPathDelimiter(FCurrentPath) + FFileList[FActiveElement].Name + '" ' + Params;
+              if WithShiftPressed then
+                cmd := 'c:run ' + cmd;
+              // Full Screen, bring WB to Front
+              if FullScreen then
+                WBenchToFront;
+              // do it
+              Ret := SystemTags(PChar(cmd), [TAG_END]);
+              if Ret <> 0 then
+                ShowMessage(FFileList[FActiveElement].Name + ' returned with error message: ' + IntToStr(Ret));
+              // wait a bit and remove message
+              if WithShiftPressed then
+                Sleep(250);
+              // fullscreen -> jump back
+              if FullScreen and not WithShiftPressed then
+                 ScreenToFront(VideoWindow^.WScreen);
             end;
-            // update to clear screen
-            Self.Update(False);
-            OtherSide.Update(False);
+          except
+            ;
           end;
-        finally
-          FS.Free;
+          // update to clear screen
+          Self.Update(False);
+          OtherSide.Update(False);
         end;
       end;
     end;
@@ -1552,7 +1574,7 @@ begin
               NotDeleted := 0;
               Break;
             end;
-            if not DeleteFile(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name) then
+            if not DeleteFile(IncludeTrailingPathDelimiter(FCurrentPath) + ExcludeTrailingPathDelimiter(FL[i].Name)) then
               Inc(NotDeleted);
           except
             Inc(NotDeleted);
@@ -1691,6 +1713,8 @@ begin
       DrawActive(FActiveElement);
     end;
   end;
+  if ShowClock then
+    DrawClock;
 end;
 
 procedure TFileList.SearchList;

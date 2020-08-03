@@ -3,7 +3,7 @@ program MCAmiga;
 uses
   ATHreads,
   workbench, icon, AppWindowUnit, Intuition,
-  Types, SysUtils, Video, mouse, keyboard,
+  Types, SysUtils, Video, mouse, keyboard, Classes,
   {$if defined(Amiga68k) or defined(MorphOS) or defined(AROS)}
   xad, xadarchive,
   {$endif}
@@ -16,6 +16,8 @@ var
 
   LeftDefaultPath: string = '';
   RightDefaultPath: string = '';
+  WindowSize: string = '';
+  DefWinSize: TRect;
 
 // Swap Destination and Source -> change the Focus
 procedure SwapSrcDest;
@@ -60,7 +62,10 @@ begin
     // special handling of the Bottom F Key Menu, if visible
     if (Me.y = ScreenHeight - 1) and DefShowMenu then
     begin
-      Len := ScreenWidth div 10;
+      if ShowClock then
+        Len := ScreenWidth div 11
+      else
+        Len := ScreenWidth div 10;
       case Me.x div Len of
         0:begin //F1
             ShowHelp;
@@ -119,6 +124,38 @@ begin
   end;
 end;
 
+procedure ParseWinSize;
+var
+  SL: TStringList;
+  i: Integer;
+begin
+  SL := TStringList.create;
+  try
+    DefWinSize := Rect(0, 0 , 0 , 0);
+    ExtractStrings(['/'], [], PChar(WindowSize), SL);
+    if SL.Count = 4 then
+    begin
+      if TryStrToInt(SL[0], i) then
+        DefWinSize.Left := i
+      else
+        Exit;
+      if TryStrToInt(SL[1], i) then
+        DefWinSize.Top := i
+      else
+        Exit;
+      if TryStrToInt(SL[2], i) then
+        DefWinSize.Width := i
+      else
+        Exit;
+      if TryStrToInt(SL[3], i) then
+        DefWinSize.Height := i
+      else
+        Exit;
+    end;
+  finally
+    SL.Free;
+  end;
+end;
 
 // Key Event, handling all key Events of main application
 // connected to EventUnit OnKeyEvent
@@ -144,9 +181,12 @@ begin
     $1F13: Src.SearchList;                             // Crtl + S  -> jump mode
     $2106: begin                                       // Ctrl + F -> toggle visibility of bottom menu
       DefShowMenu := not DefShowMenu;
+      LockScreenUpdate;
       ClearScreen;
       Left.Resize(Rect(0, 0, (ScreenWidth div 2) - 1, ScreenHeight - 1));
       Right.Resize(Rect((ScreenWidth div 2), 0, ScreenWidth - 1, ScreenHeight - 1));
+      UnLockScreenUpdate;
+      UpdateScreen(False);
     end;
     kbdInsert, $23, $30, $20: begin                    // Insert, #, 0, Space -> Select file, scan dir size
       if ((st and kbShift) <> 0) and (TranslateKeyEvent(Ev) and $ffff = $20) then
@@ -202,7 +242,7 @@ begin
         Right.Update(False);
       end;
     end;
-    kbdF1: begin                                      // F1 -> Help
+    kbdF1, kbdF20: begin                               // F1,Help -> Help
       if ((st and kbAlt) <> 0) or ((st and kbCtrl) <> 0) then
       begin
         Left.CurrentPath := '';
@@ -348,6 +388,11 @@ begin
     //
     AutoCreateInfo := GetStrToolType(DObj, 'CREATEDIRICON', '0') = '';
     //
+    ShowClock := GetStrToolType(DObj, 'SHOWCLOCK', '0') = '';
+    //
+    WindowSize := GetStrToolType(DObj, 'WINDOW', '');
+    ParseWinSize;
+    //
     FreeDiskObject(DObj);
   end;
 end;
@@ -405,6 +450,10 @@ begin
     // strangely the opened video screen is not active
     ActivateWindow(VideoWindow);
   end;
+
+  if not DefWinSize.IsEmpty then
+    Intuition.ChangeWindowBox(VideoWindow, DefWinSize.Left, DefWinSize.Top, DefWinSize.Width, DefWinSize.Height);
+
   // all done lets draw
   UnlockScreenUpdate;
   UpdateScreen(True);

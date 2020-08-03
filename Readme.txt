@@ -103,6 +103,10 @@ INFOFILESAUTOHANDLING if this tool type is given, it will automatically move, re
 
 CREATEDIRICON automatically create an icon when a directory is created (if envarc:sys/def_drawer.info exists)
 
+SHOWCLOCK show a clock in the lower right edge
+
+WINDOW=  default window size at startup, separated with "/" Left/Top/Width/Height e.g. WINDOW=0/0/640/480
+
 History:
 ########
 

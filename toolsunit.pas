@@ -16,7 +16,37 @@ function OverwriteText(Src, dest: string): string;
 procedure ConvertChar(var c: Char); inline;
 procedure ConvertCharBack(var c: Char); inline;
 
+function IsExecutable(AFilename: string): Boolean;
+
 implementation
+
+const
+  // Magic of Amiga exe (first 4 bytes), check before start
+  {$ifdef Amiga68k}
+  ExecStart: array of Byte = ($00, $00, $03, $F3);
+  {$else}
+  ExecStart: array of Byte = ($7F, $45, $4c, $46);
+  {$endif}
+
+
+function IsExecutable(AFilename: string): Boolean;
+var
+  Magic: array of Byte;
+  FS: TFileStream;
+begin
+  Result := False;
+  FS := nil;
+  try
+    SetLength(Magic, Length(ExecStart));
+    FillChar(Magic[0], Length(Magic), 0);
+    //
+    FS := TFileStream.Create(AFileName, fmOpenRead);
+    FS.Read(Magic[0], Length(Magic));
+    Result := CompareMem(@Magic[0], @ExecStart[0], Length(ExecStart));
+  finally
+    FS.Free;
+  end;
+end;
 
 procedure ConvertChar(var c: Char); inline;
 begin

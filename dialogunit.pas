@@ -1025,6 +1025,19 @@ begin
         if CursorX < TxtL + Length(NewName) then
           SetCursorPos(CursorX + 1, CursorY);
       end;
+      kbdDelete: begin // Delete delete char
+        p := CursorX - TxtL + 1;
+        if CursorX < TxtL + Length(NewName) then
+        begin
+          Delete(NewName, p, 1);
+          BGPen := Black;
+          FGPen := LightGray;
+          SetTextA(TxtL, Mid.y, Newname);
+          SetChar(TxtL + Length(NewName), Mid.y, ' ');
+          SetCursorPos(CursorX, Mid.Y);
+          UpdateScreen(False);
+        end;
+      end;
       $1C0D, $000D: begin
         Result := ButtonsArray[SelectedButton].Result;
         Break;
