@@ -5,7 +5,7 @@ unit diffviewerunit;
 interface
 
 uses
-  Classes, SysUtils, Diff, keyboard, Math;
+  Classes, SysUtils, Diff, keyboard, Math, dialogunit;
 
 type
 
@@ -18,6 +18,8 @@ type
   TCompareLine = record
     Compares: array of TCompRec;
     Len: Integer;
+    Line1: LongInt;
+    Line2: LongInt;
     Changed: Boolean;
   end;
 
@@ -119,6 +121,7 @@ procedure TDiffViewer.SetLineIndicator(Enable: Boolean);
 var
   f1, f2: string;
 begin
+  writeln(FSelectedLine, ' ', StartLine, ' ', StartLine + LeftRect.Height);
   if InRange(FSelectedLine, StartLine, StartLine + LeftRect.Height) then
   begin
     if ViewLines[FSelectedLine].Changed then
@@ -131,8 +134,8 @@ begin
       SetChar(ScreenWidth - 1, LeftRect.Top + FSelectedLine - StartLine, '<');
       BGPen := Cyan;
       FGPen := Black;
-      f1 := IntToStr(FSelectedLine + 1) + '/';
-      f2 := IntToStr(Length(ViewLines));
+      f1 := IntToStr(ViewLines[FSelectedLine].Line1) + VLINE;
+      f2 := IntToStr(ViewLines[FSelectedLine].Line2);
       SetText((RightRect.Left) - Length(f1), 0, f1);
       SetText((RightRect.Left), 0, f2);
     end
@@ -148,9 +151,12 @@ procedure TDiffViewer.FormatText;
 var
   CurL: LongInt;
   i: Integer;
+  L1, L2: LongInt;
 begin
   SetLength(ViewLines, 100);
   CurL := 0;
+  L1 := 1;
+  L2 := 1;
 
   SetLength(ViewLines[0].Compares, 100);
   ViewLines[0].Len := 0;
@@ -168,14 +174,27 @@ begin
       Inc(Len);
       if ((Compares[Len - 1].chr1 = #13) or (Compares[Len - 1].chr2 = #13)) or ((Len > 0) and ((Compares[Len - 1].chr1 = #10) or (Compares[Len - 1].chr2 = #10))) then
       begin
-        Compares[Len - 1].chr1 := ' ';
-        Compares[Len - 1].chr2 := ' ';
+        Line1 := L1;
+        Line2 := L2;
+        if Compares[Len - 1].chr1 in [#13, #10] then
+        begin
+          Inc(L1);
+          Compares[Len - 1].chr1 := ' ';
+        end;
+        if Compares[Len - 1].chr2 in [#13, #10] then
+        begin
+          Inc(L2);
+          Compares[Len - 1].chr2 := ' ';
+        end;
+        //
         Inc(CurL);
         if CurL > High(ViewLines) then
           SetLength(ViewLines, CurL + 100);
         SetLength(ViewLines[Curl].Compares, 100);
         ViewLines[Curl].Len := 0;
         ViewLines[Curl].Changed := False;
+        ViewLines[Curl].Line1 := L1;
+        ViewLines[Curl].Line2 := L2;
       end
       else
         if Len > High(Compares) then
@@ -187,24 +206,22 @@ end;
 
 procedure TDiffViewer.Paint;
 var
-  i, x, j, y, y1, CurL: Integer;
+  i, x, j, y, CurL: Integer;
   c1,c2: Char;
   Changed: Boolean;
   f1, f2: String;
 begin
   BGPen := Blue;
-  for y1 := 0 to ScreenHeight - 1 do
+  for y := 0 to ScreenHeight - 1 do
     for i := 0 to ScreenWidth - 1 do
-      SetChar(i, y1, ' ');
+      SetChar(i, y, #0);
 
   // draw
   BGPen := Cyan;
   FGPen := Black;
   //
   for i := 0 to ScreenWidth - 1 do
-  begin
     SetChar(i, 0, ' ');
-  end;
 
   LeftRect := Rect(1, 1, (ScreenWidth div 2) - 1, ScreenHeight - 4);
   RightRect := Rect((ScreenWidth div 2) + 1, 1, ScreenWidth - 1, ScreenHeight - 4);
@@ -223,10 +240,8 @@ begin
   for i := 0 to ScreenWidth - 1 do
     SetChar(i, ScreenHeight - 3, HLine);
 
-
-
   x := 0;
-  y1 := 0;
+  y := 0;
   Changed := False;
 
   for CurL := StartLine to High(ViewLines) do
@@ -234,8 +249,8 @@ begin
     BGPen := Blue;
     for i := 0 to LeftRect.Width - 1 do
     begin
-      SetChar(LeftRect.Left + i, y1 + LeftRect.Top, ' ');
-      SetChar(RightRect.Left + i, y1 + RightRect.Top, ' ');
+      SetChar(LeftRect.Left + i, y + LeftRect.Top, ' ');
+      SetChar(RightRect.Left + i, y + RightRect.Top, ' ');
     end;
     for i := 0 to ViewLines[CurL].Len - 1 do
     begin
@@ -246,68 +261,45 @@ begin
         ckAdd: begin
           Changed := True;
           BGPen := LightGray;
-          SetChar(LeftRect.Left + i, y1 + LeftRect.Top, c1);
+          SetChar(LeftRect.Left + i, y + LeftRect.Top, c1);
           BGPen := Green;
-          SetChar(RightRect.Left + i, y1 + RightRect.Top, c2);
+          SetChar(RightRect.Left + i, y + RightRect.Top, c2);
         end;
         ckDelete:begin
           Changed := True;
           BGPen := Red;
-          SetChar(LeftRect.Left + i, y1 + LeftRect.Top, c1);
+          SetChar(LeftRect.Left + i, y + LeftRect.Top, c1);
           BGPen := LightGray;
-          SetChar(RightRect.Left + i, y1 + LeftRect.Top, c2);
+          SetChar(RightRect.Left + i, y + LeftRect.Top, c2);
         end;
         ckModify: begin
           Changed := True;
           BGPen := Brown;
-          SetChar(LeftRect.Left + i, y1 + LeftRect.Top, c1);
-          SetChar(RightRect.Left + i, y1 + LeftRect.Top, c2);
+          SetChar(LeftRect.Left + i, y + LeftRect.Top, c1);
+          SetChar(RightRect.Left + i, y + LeftRect.Top, c2);
         end;
         ckNone: begin
           BGPen := Blue;
-          SetChar(LeftRect.Left + i, y1 + LeftRect.Top, c1);
-          SetChar(RightRect.Left + i, y1 + LeftRect.Top, c2);
+          SetChar(LeftRect.Left + i, y + LeftRect.Top, c1);
+          SetChar(RightRect.Left + i, y + LeftRect.Top, c2);
         end;
       end;
       x := i;
       if x >= LeftRect.Width then
         Break;
     end;
-    BGPen := Blue;
-    for j := x + 1 to LeftRect.Width do
-    begin
-      SetChar(j + LeftRect.Left, LeftRect.Top + y1, ' ');
-      SetChar(j + RightRect.Left, RightRect.Top + y1, ' ');
-    end;
     if Changed then
       BGPen := Yellow
     else
       BGPen := Blue;
     Changed := False;
-    SetChar(0, LeftRect.Top + y1, ' ');
-    SetChar(ScreenWidth - 1, LeftRect.Top + y1, ' ');
+    SetChar(0, LeftRect.Top + y, ' ');
+    SetChar(ScreenWidth - 1, LeftRect.Top + y, ' ');
     // next line
-    Inc(y1);
-    if y1 > LeftRect.Height then
+    Inc(y);
+    if y > LeftRect.Height then
       Break;
   end;
-
-  BGPen := Blue;
-  for y := x to LeftRect.Width do
-  begin
-    SetChar(LeftRect.Left + y, LeftRect.Top + CurL, ' ');
-    SetChar(RightRect.Left + y, RightRect.Top + CurL, ' ');
-  end;
-  for y := CurL to LeftRect.Height do
-  begin
-    SetChar(0, LeftRect.Top + y, ' ');
-    for x := 0 to LeftRect.Width do
-    begin
-      SetChar(LeftRect.Left + x, LeftRect.Top + y, ' ');
-      SetChar(RightRect.Left + x, RightRect.Top + y, ' ');
-    end;
-  end;
-
   DrawCurrentLine;
   SetLineIndicator(True);
   UpdateScreen(True);
@@ -343,6 +335,8 @@ var
   FS: TFileStream;
   Key: TKeyEvent;
   st: Byte;
+  Found: Boolean;
+  i: LongInt;
 begin
   Text1 := nil;
   Text2 := nil;
@@ -383,7 +377,28 @@ begin
         kbdUp: begin
           SetLineIndicator(False);
           XOffset := 0;
-          FSelectedLine := Max(FSelectedLine - 1, 0);
+          if st and kbShift <> 0 then
+          begin
+            Found := False;
+            for i := FSelectedLine - 1 downto 0 do
+            begin
+              if ViewLines[i].Changed then
+              begin
+                Found := True;
+                FSelectedLine := i;
+                Break;
+              end;
+            end;
+            if not Found then
+            begin
+              ShowMessage('no more changes found');
+              Paint;
+            end;
+          end
+          else
+          begin
+            FSelectedLine := Max(FSelectedLine - 1, 0);
+          end;
           if FSelectedLine > StartLine then
           begin
             DrawCurrentLine;
@@ -400,7 +415,28 @@ begin
         kbdDown: begin
           SetLineIndicator(False);
           XOffset := 0;
-          FSelectedLine := Min(FSelectedLine + 1, High(ViewLines));
+          if st and kbShift <> 0 then
+          begin
+            Found := False;
+            for i := FSelectedLine + 1 to High(ViewLines) do
+            begin
+              if ViewLines[i].Changed then
+              begin
+                Found := True;
+                FSelectedLine := i;
+                Break;
+              end;
+            end;
+            if not Found then
+            begin
+              ShowMessage('no more changes found');
+              Paint;
+            end;
+          end
+          else
+          begin
+            FSelectedLine := Min(FSelectedLine + 1, High(ViewLines));
+          end;
           if FSelectedLine <= StartLine + LeftRect.Height then
           begin
             DrawCurrentLine;
@@ -494,86 +530,6 @@ begin
           UpdateScreen(False);
         end;
 
-
-        { $2106: begin                                       // Ctrl + f -> toggle visibility of bottom menu
-          ShowMenu := not ShowMenu;
-          ClearScreen;
-          Paint;
-        end;
-        kbdUp: begin
-          FUntilByte := 0;
-          if Mode = vmText then
-            StartLine := StartLine - 1;
-          if Mode = vmHex then
-            CurrentByte := Max(0, CurrentByte - NumBytesPerLine);
-        end;
-        kbdDown: begin
-          FUntilByte := 0;
-          if Mode = vmText then
-            StartLine := StartLine + 1;
-          if Mode = vmHex then
-            CurrentByte := Min(NumBytes - 1, Int64(CurrentByte) + NumBytesPerLine);
-        end;
-        kbdRight: begin
-          FUntilByte := 0;
-          if Mode = vmHex then
-            CurrentByte :=  Min(NumBytes - 1, Int64(CurrentByte) + 1);
-        end;
-        kbdLeft: begin
-          FUntilByte := 0;
-          if Mode = vmHex then
-            CurrentByte := Max(0, CurrentByte - 1);
-        end;
-        kbdPgUp, $39, $8D00:begin
-          FUntilByte := 0;
-          if Mode = vmText then
-            StartLine := StartLine - 10;
-          if Mode = vmHex then
-            CurrentByte := Max(0, CurrentByte - Int64(ScreenHeight) * NumBytesPerLine);
-        end;                                       // pg up -> Move around
-        kbdPgDn, $33, $9100:  begin
-          FUntilByte := 0;
-          if Mode = vmText then
-            StartLine := StartLine + 10;
-          if Mode = vmHex then
-            CurrentByte := Min(NumBytes - 1, CurrentByte + Int64(ScreenHeight) * NumBytesPerLine);
-        end;                                      // pg down -> Move around
-        kbdHome, $37, $7300: begin
-          FUntilByte := 0;
-          FCurrentByte := 0;
-          StartLine := 0;                      // Home -> Move around
-        end;
-        kbdEnd, $31, $7400: begin
-          FUntilByte := 0;
-          if Mode = vmText then
-            StartLine := MaxInt                  // end -> Move around
-          else
-            CurrentByte := NumBytes - 1;
-        end;
-        kbdF10,kbdF3: Break;
-        kbdF1: begin ShowViewHelp; Paint; end;
-        kbdF4: SwitchMode;
-        kbdF5: begin
-          FUntilByte := 0;
-          GoToLineNumber;
-        end;
-        kbdF7: begin
-          FUntilByte := 0;
-          if Mode = vmText then
-          begin
-            if st and kbShift <> 0 then
-              FindText(LastTextSearch, Point(FromSel.X + 1, FromSel.Y))
-            else
-              SearchText;
-          end;
-          if Mode = vmHex then
-          begin
-            if st and kbShift <> 0 then
-              FindBinary(LastBinSearch, FCurrentByte + 1)
-            else
-              SearchBinary;
-          end;
-        end;}
       end;
     end;
     Sleep(25);
