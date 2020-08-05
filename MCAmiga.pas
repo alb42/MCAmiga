@@ -7,7 +7,7 @@ uses
   {$if defined(Amiga68k) or defined(MorphOS) or defined(AROS)}
   xad, xadarchive,
   {$endif}
-  FileListUnit, dialogunit, EventUnit, archiveunit;
+  FileListUnit, dialogunit, EventUnit, archiveunit, ViewerUnit, diffviewerunit;
 
 var
   Src: TFileList;
@@ -402,7 +402,23 @@ procedure StartMe;
 var
   Mode: TVideoMode;
   VideoFontHeight, x,y: LongInt;
+  Diffmode: Boolean;
+  ViewMode: Boolean;
 begin
+  Diffmode := False;
+  ViewMode := False;
+  if ParamCount > 0 then
+  begin
+    if ParamStr(1) = 'diff' then
+    begin
+      Diffmode := True;
+    end else
+    if ParamStr(1) = 'view' then
+    begin
+      Viewmode := True;
+    end;
+  end;
+
   LockScreenUpdate;
   // defaults are available on every amiga style system
   LeftDefaultPath := 'sys:';
@@ -454,19 +470,52 @@ begin
   if not DefWinSize.IsEmpty then
     Intuition.ChangeWindowBox(VideoWindow, DefWinSize.Left, DefWinSize.Top, DefWinSize.Width, DefWinSize.Height);
 
-  // all done lets draw
-  UnlockScreenUpdate;
-  UpdateScreen(True);
+  if Diffmode then
+  begin
+    if (ParamCount = 3) and FileExists(ParamStr(2)) and FileExists(ParamStr(3)) then
+    begin
+      UnlockScreenUpdate;
+      with TDiffViewer.Create do
+      begin
+        Execute(ParamStr(2), PAramStr(3));
+        Free;
+      end;
+    end
+    else
+    begin
+      writeln('MCAmiga diff viewer usage: ' + ExtractFileName(ParamStr(0)) + ' diff <file1> <file2>');
+    end;
+  end
+  else
+  if Viewmode then
+  begin
+    if (ParamCount = 2) and FileExists(ParamStr(2)) then
+    begin
+      UnlockScreenUpdate;
+      FileViewer(ParamStr(2));
+    end
+    else
+    begin
+      writeln('MCAmiga viewer usage: ' + ExtractFileName(ParamStr(0)) + ' view <file1>');
+    end;
+  end
+  else
+  begin
 
-  Right.ActiveElement := 0;
-  Left.IsActive := True;
+    // all done lets draw
+    UnlockScreenUpdate;
+    UpdateScreen(True);
 
-  // Activate the App Window
-  MakeAppWindow;
-  // run the main event cycle
-  RunApp;
-  // Application is closed, remove everything
-  DestroyAppWindow;
+    Right.ActiveElement := 0;
+    Left.IsActive := True;
+
+    // Activate the App Window
+    MakeAppWindow;
+    // run the main event cycle
+    RunApp;
+    // Application is closed, remove everything
+    DestroyAppWindow;
+  end;
   //
   Left.Free;
   Right.Free;

@@ -799,8 +799,13 @@ begin
       etAssign: col := LightGray;
     end;
     // invert color when focussed entry
-    if FIsActive and (Idx = FActiveElement) then
-      BGPen := col and $F                            // make sure it's not blinking ;)
+    if Idx = FActiveElement then
+    begin
+      if FIsActive then
+        BGPen := col and $F                            // make sure it's not blinking ;)
+      else
+        FGPen := LightGray;
+    end
     else
       FGPen := col;
     // limit the name, it's not a path, and write to video

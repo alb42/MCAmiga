@@ -13,6 +13,8 @@ cp Readme.txt Release/MCAmiga
 cp Readme.txt.info Release/MCAmiga
 mkdir Release/MCAmiga/C
 cp mc Release/MCAmiga/C/mc
+cp mcview Release/MCAmiga/C/mcview
+cp mcdiff Release/MCAmiga/C/mcdiff
 
 
 rm -f MCAmiga

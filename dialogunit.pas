@@ -172,6 +172,7 @@ type
     procedure UnpackArchive;   // Unpack current archive to dest
     procedure SearchStart;     // open the search requester
     procedure SelectInfo;
+    procedure DiffViewer;
   protected
     procedure ProcessMouse(MouseEvent: TMouseEvent); override;
     procedure DrawButtons; override;
@@ -237,7 +238,7 @@ var
 implementation
 
 uses
-  ArchiveUnit, searchunit, ToolsUnit;
+  ArchiveUnit, searchunit, ToolsUnit, diffviewerunit;
 
 // Help text for the main application! MaxLength 70
 const       //.........1.........2.........3.........4.........5........6.........7.........8
@@ -539,6 +540,21 @@ begin
   SrcP.SelectInfoFiles;
 end;
 
+procedure TToolsMenu.DiffViewer;
+var
+  Diff: TDiffViewer;
+  s1, s2: string;
+begin
+  Diff := TDiffViewer.Create;
+  try
+    s1 := IncludeTrailingPathDelimiter(SrcP.CurrentPath) + SrcP.ActiveEntry.Name;
+    s2 := IncludeTrailingPathDelimiter(DestP.CurrentPath) + DestP.ActiveEntry.Name;
+    Diff.Execute(s1, s2);
+  finally
+    Diff.Free;
+  end;
+end;
+
 procedure TToolsMenu.ProcessMouse(MouseEvent: TMouseEvent);
 var
   NEntry: Integer;
@@ -603,6 +619,7 @@ begin
   AddToolsEntry('Extract archive contents', @UnpackArchive);
   AddToolsEntry('Find Files', @SearchStart);
   AddToolsEntry('Select Icons of selected files', @SelectInfo);
+  AddToolsEntry('Diff Files', @DiffViewer);
 end;
 
 function TToolsMenu.Execute: TDialogResult;

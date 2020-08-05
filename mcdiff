@@ -1,0 +1,4 @@
+.KEY filename1/A,filename2/A
+.BRA <
+.KET >
+Work:MCAmiga/MCAmiga diff <filename1> <filename2>
