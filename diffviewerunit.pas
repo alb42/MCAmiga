@@ -121,7 +121,6 @@ procedure TDiffViewer.SetLineIndicator(Enable: Boolean);
 var
   f1, f2: string;
 begin
-  writeln(FSelectedLine, ' ', StartLine, ' ', StartLine + LeftRect.Height);
   if InRange(FSelectedLine, StartLine, StartLine + LeftRect.Height) then
   begin
     if ViewLines[FSelectedLine].Changed then
