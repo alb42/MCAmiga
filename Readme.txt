@@ -8,15 +8,16 @@ if the font is too big try to set the Environment variable FPC_VIDEO_BUILTINFONT
 e.g. echo vga8 >env:FPC_VIDEO_BUILTINFONT
 and restart the program, or create it in Envarc: to make it available as default.
 
-in the c folder is a example startupup script for mc which you can use after booting without startup-seqeuence
-put that file mc to c: adjust the path to MCAmiga at end of script and make it executable with "protect c:mc swerd"
+in the c folder there are some example startupup scripts for mc, mcview, mcdiff which you can use after
+booting without startup-seqeuence the scripts to c: adjust the path to MCAmiga at end of scripts
+and make it executable with e.g. "protect c:mc swerd"
 after booting without startup-sequence simply type "mc"
 
 Requirements:
 #############
 
 AmigaOS 3.x, 68020, 4 MB RAM
-AmigaOS 4.x PowerPC (except X5000)
+AmigaOS 4.x PowerPC
 MorphOS 3.x PowerPC
 AROS i386-ABIv0, RasPi1-3 ARM ABIv0, x64 ABIv1 NonSMP
 
@@ -106,6 +107,17 @@ CREATEDIRICON automatically create an icon when a directory is created (if envar
 SHOWCLOCK show a clock in the lower right edge
 
 WINDOW=  default window size at startup, separated with "/" Left/Top/Width/Height e.g. WINDOW=0/0/640/480
+
+Command-Line:
+#############
+
+you can directly start the text viewer and the file comparison from shell
+for the viewer start with:
+MCAmiga view file
+for a file comparison start with:
+MCAmiga diff file1 file2
+
+(or you can use the short cut scripts mcview and mcdiff, if you copied them to your path)
 
 History:
 ########
