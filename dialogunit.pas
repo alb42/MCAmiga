@@ -9,8 +9,8 @@ uses
   Types, Classes, SysUtils, Video, Keyboard, Mouse, Math, EventUnit;
 
 const
-  NumVERSION = '0.8';
-  VERSION = '$VER: MCAmiga 0.8 (05.06.2020)';
+  NumVERSION = '0.9';
+  VERSION = '$VER: MCAmiga 0.9 (06.08.2020)';
 
 type
                 //yes     no,    yes to All    No to all      Abort   None
