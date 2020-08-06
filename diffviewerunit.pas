@@ -5,11 +5,19 @@ unit diffviewerunit;
 interface
 
 uses
-  Classes, SysUtils, Diff, keyboard, Math, dialogunit;
+  Classes, SysUtils, Diff, keyboard, Math, dialogunit, FileListUnit;
+
+// Help Text for the Viewer
+const           //.........1.........2.........3.........4.........5........6.........7
+  HelpDiffText = ' ---- Diff Viewer Help -----  '#13#10 +
+                 ' F1         - Help     '#13#10 +
+                 ' ESC        - Leave Viewer'#13#10 +
+                 ' Up, Down                              - navigate in Text'#13#10  +
+                 ' Ctrl Up,Down,Pg Up,9,Pg Down,3 - fast navigation'#13#10 +
+                 ' Ctrl Left,Right,Home,7,End,1   - to start/end'#13#10 +
+                 ' Shift Up,Down                  - next/prev. difference';
 
 type
-
-
   TCompRec = record
     Kind: TChangeKind;
     chr1, chr2 : Char;
@@ -25,7 +33,7 @@ type
 
   { TDiffViewer }
 
-  TDiffViewer = class
+  TDiffViewer = class(TPaintedClass)
   private
     XOffset: Integer;
     File1, File2: string;
@@ -40,17 +48,19 @@ type
     procedure DrawCurrentLine;
     procedure SetLineIndicator(Enable: Boolean);
     procedure FormatText;
-    procedure Paint;
+
     function PollNextKey: TKeyEvent;
   public
-    constructor Create; virtual;
+    constructor Create; override;
     destructor Destroy; override;
+
+    procedure Paint; override;
     procedure Execute(AFilename1, AFilename2: string);
   end;
 
 implementation
 uses
-  Video, FileListUnit, eventunit;
+  Video, eventunit;
 
 const
   HLine = #196;
@@ -320,6 +330,7 @@ end;
 
 constructor TDiffViewer.Create;
 begin
+  inherited;
   Diff := nil;
 end;
 
@@ -373,6 +384,10 @@ begin
     begin
       st := GetKeyEventShiftState(Key);
       case (TranslateKeyEvent(Key) and $FFFF) of
+        kbdF1: begin
+          ShowMessage(HelpDiffText);
+          Paint;
+        end;
         kbdUp: begin
           SetLineIndicator(False);
           XOffset := 0;

@@ -23,7 +23,7 @@ type
 
   { TFileViewer }
 
-  TFileViewer = class
+  TFileViewer = class(TPaintedClass)
   private
     Terminated: Boolean;
     Buffer: PByte;
@@ -42,7 +42,6 @@ type
     procedure GotMouseEvent(Me: TMouseEvent);
     procedure FormatText;
     procedure DrawMenu;
-    procedure Paint;
     procedure SetCurrentByte(AValue: LongWord);
     procedure SetStartLine(AValue: Integer);
     procedure SwitchMode;
@@ -64,8 +63,10 @@ type
     procedure SearchText;
     procedure FindText(SearchString: string; FromWhere: TPoint);
   public
-    constructor Create;
+    constructor Create; override;
     destructor Destroy; override;
+    procedure Paint; override;
+
     procedure Execute(AFilename: string; ASearch: string = ''; Posi: LongInt = -1);
     property StartLine: Integer read FStartLine write SetStartLine;
     property CurrentByte: LongWord read FCurrentByte write SetCurrentByte;
@@ -697,6 +698,7 @@ end;
 
 constructor TFileViewer.Create;
 begin
+  inherited;
   ShowMenu := DefShowMenu;
   MemLine := nil;
   LineStarts := TList.Create;

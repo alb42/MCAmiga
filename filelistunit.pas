@@ -82,6 +82,17 @@ type
   // Mouse mode for click and drag (if first one is select, select all on drag)
   TMouseSelMode = (msNone, msSelect, msDeselect);
 
+  { TPaintedClass }
+
+  TPaintedClass = class
+  public
+    constructor Create; virtual;
+    destructor Destroy; override;
+    //
+    procedure Paint; virtual;
+  end;
+
+
   { TFileList }
 
   TFileList = class
@@ -179,10 +190,14 @@ type
   // get a temp file name
   function GetTempFileEvent(const Dir: string; const Prefix: string):string;
 
+var
+  ClassToPaint: TPaintedClass = nil;
+
 implementation
 
 uses
   DialogUnit, EventUnit, ViewerUnit, ToolsUnit;
+
 
 procedure RecurseDirs(BasePath, AName: string; FL: TEntryList; var Dirs: Integer; var Files: Integer; var Size: Int64); forward;
 
@@ -293,6 +308,24 @@ begin
     ConvertChar(c);
     SetChar(x + i - 1, y, c);
   end;
+end;
+
+{ TPaintedClass }
+
+constructor TPaintedClass.Create;
+begin
+  ClassToPaint := Self;
+end;
+
+destructor TPaintedClass.Destroy;
+begin
+  ClassToPaint := nil;
+  inherited Destroy;
+end;
+
+procedure TPaintedClass.Paint;
+begin
+  //
 end;
 
 { TEntryList }
@@ -1086,7 +1119,6 @@ begin
   FInnerRect := FRect;
   FInnerRect.Inflate(-1, -1);
   FInnerRect.Height := FInnerRect.Height - 2;
-  Update(False);
 end;
 
 // Update Everyting, UpdateList = Also scan the directory again
