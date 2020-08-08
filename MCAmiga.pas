@@ -485,7 +485,12 @@ begin
       UnlockScreenUpdate;
       with TDiffViewer.Create do
       begin
-        Execute(ParamStr(2), PAramStr(3));
+        try
+          Execute(ParamStr(2), PAramStr(3));
+        except
+          on E:Exception do
+            ShowMessage('Error load files to compare: '#10 + e.Message);
+        end;
         Free;
       end;
     end

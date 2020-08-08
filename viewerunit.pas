@@ -20,6 +20,7 @@ uses
 
 type
   TViewerMode = (vmText, vmHex);
+  THighlighter = (hiNone, hiDiff, hiPascal, hiIni);
 
   { TFileViewer }
 
@@ -48,6 +49,8 @@ type
     procedure GoToLineNumber;
 
   private
+    Highlighter: THighlighter;
+    WithHighlighter: Boolean;
     ShowMenu: Boolean;
     MemLine: PChar;
     MemLineLength: Integer;
@@ -62,6 +65,7 @@ type
     LastTextSearch: string;
     procedure SearchText;
     procedure FindText(SearchString: string; FromWhere: TPoint);
+    procedure SetHighlighterColor(Line: string);
   public
     constructor Create; override;
     destructor Destroy; override;
@@ -76,7 +80,12 @@ procedure FileViewer(AFileName: string; ASearch: string = ''; Posi: LongInt = -1
 begin
   With TFileViewer.Create do
   begin
-    Execute(AFileName, ASearch, Posi);
+    try
+      Execute(AFileName, ASearch, Posi);
+    except
+      on E:Exception do
+        Showmessage('Error load file to view: '#10 + e.message);
+    end;
     Free;
   end;
 end;
@@ -260,6 +269,7 @@ var
   s, s1, s2: String;
   pl: PByte;
   EndScreen: LongInt;
+  OldPen: Word;
 
   function IsByteSelected(Num: LongWord): Boolean;
   begin
@@ -298,11 +308,11 @@ begin
       if i + StartLine < LineStarts.Count then
       begin
         s := GetTextLine(i + StartLine);
-        {for j := 0 to Min(ScreenWidth - 1, MemLineLength - 1) do
+        if WithHighlighter and (Highlighter <> hiNone) then
         begin
-          BGPen := Blue;
-          SetChar(j, i + 1, MemLine[j]);
-        end;}
+          SetHighlighterColor(s);
+        end;
+        //
         l := Length(s);
         if InRange(i + StartLine, FromSel.Y, ToSel.Y) then
         begin
@@ -310,11 +320,14 @@ begin
           s2 := Copy(s1, 1, FromSel.X - 1);
           l1 := Length(s2);
           SetTextA(0, i + 1, s2);
+          OldPen := FGPen;
+          FGPen := White;
           BGPen := Cyan;
           s2 := Copy(s1, FromSel.X, ToSel.X - FromSel.X);
           Delete(s1, 1, ToSel.X - 1);
           SetTextA(l1, i + 1, s2);
           l1 := l1 + Length(s2);
+          FGPen := OldPen;
           BGPen := Blue;
           SetTextA(l1, i + 1, s1);
         end
@@ -696,6 +709,34 @@ begin
   Paint
 end;
 
+procedure TFileViewer.SetHighlighterColor(Line: string);
+begin
+  case Highlighter of
+    hiDiff: begin
+      if Length(Line) > 0 then
+      begin
+        case Line[1] of
+          '<','-': FGPen := Red;
+          '>': FGPen := Green;
+          '0'..'9': FGPen := Yellow;
+        end;
+      end;
+    end;
+    hiIni: begin
+      if Length(Line) > 0 then
+      begin
+        case Line[1] of
+          '[','-': FGPen := Yellow;
+          else
+            FGPen := White;
+        end;
+      end;
+    end
+    else
+      FGPen := White;
+  end;
+end;
+
 constructor TFileViewer.Create;
 begin
   inherited;
@@ -730,11 +771,33 @@ var
   Magic: array[0..255] of Byte;
   MaxMagic, i: Integer;
   IsASCII: Boolean;
+  Ext: string;
 begin
   MemLineLength := ScreenWidth + 10;
   MemLine := AllocMem(MemLineLength);
   //
   FileName := AFilename;
+
+  Highlighter := hiNone;
+  WithHighlighter := False;
+
+  Ext := LowerCase(ExtractFileExt(AFilename));
+  if (Ext = '.diff') or (Ext = '.patch') then
+  begin
+    Highlighter := hiDiff;
+    WithHighlighter := True;
+  end;
+  if (Ext = '.pas') or (Ext = '.pp') or (Ext = '.lpr') or (Ext = '.dpr') then
+  begin
+    Highlighter := hiPascal;
+    WithHighlighter := True;
+  end;
+  if Ext = '.ini' then
+  begin
+    Highlighter := hiIni;
+    WithHighlighter := True;
+  end;
+
   LineStarts.Clear;
   Magic[0] := 0;
   FS := TFileStream.Create(FileName, fmOpenRead);
@@ -844,6 +907,13 @@ begin
             StartLine := MaxInt                  // end -> Move around
           else
             CurrentByte := NumBytes - 1;
+        end;
+        $1F13: begin
+          if Highlighter <> hiNone then
+          begin
+            WithHighlighter := not WithHighlighter;
+            Paint;
+          end;
         end;
         kbdF10,kbdF3: Break;
         kbdF1: begin ShowViewHelp; Paint; end;

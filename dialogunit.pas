@@ -550,9 +550,11 @@ begin
     s1 := IncludeTrailingPathDelimiter(SrcP.CurrentPath) + SrcP.ActiveEntry.Name;
     s2 := IncludeTrailingPathDelimiter(DestP.CurrentPath) + DestP.ActiveEntry.Name;
     Diff.Execute(s1, s2);
-  finally
-    Diff.Free;
+  except
+    on E:Exception do
+      ShowMessage('Error load files to do compare: '#10 + E.Message);
   end;
+  Diff.Free;
 end;
 
 procedure TToolsMenu.ProcessMouse(MouseEvent: TMouseEvent);
