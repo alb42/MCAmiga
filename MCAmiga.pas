@@ -369,9 +369,17 @@ end;
 procedure GetSettings;
 var
   DObj: PDiskObject;
+  wbarg: pWBArgList;
 begin
   // Load icon propertied
   DObj := GetDiskObject(PChar(ParamStr(0)));
+  if (not Assigned(DObj)) and Assigned(AOS_wbMsg) then
+  begin
+    // if the file not found, try to get it via the wbarg directly
+    wbarg := PWBStartup(AOS_wbMsg)^.sm_ArgList;
+    DObj := GetDiskObject(wbARG^[1].wa_Name)
+  end;
+
   if Assigned(DObj) then
   begin
     // Viewer
