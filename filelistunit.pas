@@ -1436,32 +1436,42 @@ end;
 
 procedure RecurseDirs(BasePath, AName: string; FL: TEntryList; var Dirs: Integer; var Files: Integer; var Size: Int64);
 var
-  Info: TSearchRec;
   Path: string;
+  DirLock: BPTR;
+  ib: TFileInfoBlock;
 begin
   Path := IncludeTrailingPathDelimiter(AName);
   if Assigned(CountPG) then
     CountPG.UpdateValue(0, BasePath + Path + ' ' + IntToStr(Files + Dirs));
-  if FindFirst(BasePath + Path + '*', faAnyFile and faDirectory, Info) = 0 then
-  begin
-    repeat
-      if (Info.Attr and faDirectory) <> 0 then
-      begin
-        Inc(Dirs);
-        if Assigned(FL) then
-          FL.AddDir(Path + Info.Name);
-        RecurseDirs(BasePath, Path + Info.Name, FL, Dirs, Files, Size);
-      end
-      else
-      begin
-        Inc(Files);
-        if Assigned(FL) then
-          FL.AddFile(Path + Info.Name, Info.Size);
-        Size := Size + Info.Size;
-      end;
-    Until FindNext(Info) <> 0;
+  DirLock := Lock(BasePath + AName, ACCESS_READ);
+  if NativeInt(DirLock) = 0 then
+    Exit;
+  try
+    if LongBool(Examine(DirLock, @ib)) then
+    begin
+      repeat
+        if not ExNext(DirLock, @ib) then
+          Break;
+        if ib.fib_DirEntryType > 0 then
+        begin
+          Inc(Dirs);
+          if Assigned(FL) then
+            FL.AddDir(Path + ib.fib_FileName);
+          RecurseDirs(BasePath, Path + ib.fib_FileName, FL, Dirs, Files, Size);
+        end
+        else
+        begin
+          Inc(Files);
+          if Assigned(FL) then
+            FL.AddFile(Path + ib.fib_FileName, ib.fib_Size);
+          Size := Size + ib.fib_Size;
+        end;
+      until False;
     end;
-  FindClose(Info);
+    //
+  finally
+    Unlock(DirLock);
+  end;
 end;
 
 procedure TFileList.DoListOfSelectedFile(Recursive: Boolean; FL: TEntryList; out Dirs: integer; out Files: Integer; out Size: Int64);
