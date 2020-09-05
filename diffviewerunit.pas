@@ -60,7 +60,7 @@ type
 
 implementation
 uses
-  Video, eventunit;
+  Video, eventunit, colorunit;
 
 const
   HLine = #196;
@@ -107,7 +107,7 @@ begin
           SetChar(i - XOffset, y2, c2);
         end;
         ckNone: begin
-          BGPen := Blue;
+          BGPen := GetColor(BackgroundColor);
           SetChar(i - XOffset, y1, c1);
           SetChar(i - XOffset, y2, c2);
         end;
@@ -120,7 +120,7 @@ begin
     end;
     for j := x to ScreenWidth - 1 do
     begin
-      BGPen := Blue;
+      BGPen := GetColor(BackgroundColor);
       SetChar(j, y1, ' ');
       SetChar(j, y2, ' ');
     end;
@@ -136,7 +136,7 @@ begin
     if ViewLines[FSelectedLine].Changed then
       BGPen := Brown
     else
-      BGPen := Blue;
+      BGPen := GetColor(BackgroundColor);
     if Enable then
     begin
       SetChar(0, LeftRect.Top + FSelectedLine - StartLine, '>');
@@ -220,7 +220,7 @@ var
   Changed: Boolean;
   f1, f2: String;
 begin
-  BGPen := Blue;
+  BGPen := GetColor(BackgroundColor);
   for y := 0 to ScreenHeight - 1 do
     for i := 0 to ScreenWidth - 1 do
       SetChar(i, y, #0);
@@ -241,7 +241,7 @@ begin
   SetText(0, 0, f1);
   SetText(ScreenWidth - Length(f2), 0, f2);
 
-  BGPen := Blue;
+  BGPen := GetColor(BackgroundColor);
   FGPen := White;
   //
   for i := 1 to ScreenHeight - 4 do
@@ -255,7 +255,7 @@ begin
 
   for CurL := StartLine to High(ViewLines) do
   begin
-    BGPen := Blue;
+    BGPen := GetColor(BackgroundColor);
     for i := 0 to LeftRect.Width - 1 do
     begin
       SetChar(LeftRect.Left + i, y + LeftRect.Top, ' ');
@@ -288,7 +288,7 @@ begin
           SetChar(RightRect.Left + i, y + LeftRect.Top, c2);
         end;
         ckNone: begin
-          BGPen := Blue;
+          BGPen := GetColor(BackgroundColor);
           SetChar(LeftRect.Left + i, y + LeftRect.Top, c1);
           SetChar(RightRect.Left + i, y + LeftRect.Top, c2);
         end;
@@ -300,7 +300,7 @@ begin
     if Changed then
       BGPen := Yellow
     else
-      BGPen := Blue;
+      BGPen := GetColor(BackgroundColor);
     Changed := False;
     SetChar(0, LeftRect.Top + y, ' ');
     SetChar(ScreenWidth - 1, LeftRect.Top + y, ' ');

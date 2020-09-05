@@ -7,7 +7,7 @@ uses
   {$if defined(Amiga68k) or defined(MorphOS) or defined(AROS)}
   xad, xadarchive,
   {$endif}
-  FileListUnit, dialogunit, EventUnit, archiveunit, ViewerUnit, diffviewerunit;
+  FileListUnit, dialogunit, EventUnit, archiveunit, ViewerUnit, diffviewerunit, colorunit;
 
 var
   Src: TFileList;
@@ -453,6 +453,9 @@ begin
   if FullScreen then
     Mode.color := False;
   Video.SetVideoMode(Mode);
+  //
+  if Intuition.IntuitionBase^.ActiveScreen^.BitMap.Depth < 3 then
+    SetLowColormode(True);
   // create Main Panels, and link them together
   Left := TFileList.Create(Rect(0, 0, (ScreenWidth div 2) - 1, ScreenHeight - 1));
   Right := TFileList.Create(Rect((ScreenWidth div 2), 0, ScreenWidth - 1, ScreenHeight - 1));

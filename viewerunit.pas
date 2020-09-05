@@ -16,7 +16,7 @@ procedure FileViewer(AFileName: string; ASearch: string = ''; Posi: LongInt = -1
 implementation
 
 uses
-  FileListUnit, DialogUnit, toolsunit;
+  FileListUnit, DialogUnit, toolsunit, colorunit;
 
 type
   TViewerMode = (vmText, vmHex);
@@ -301,7 +301,7 @@ begin
     s :=  IntToStr(StartLine + 1) + ' - ' + IntToStr(Min(LineStarts.Count, (StartLine + 1) + EndScreen)) + '/' + IntToStr(LineStarts.Count);
     SetText(ScreenWidth - Length(s), 0, s);
 
-    BGPen := Blue;
+    BGPen := GetColor(BackgroundColor);
     FGPen := White;
     for i := 0 to EndScreen do
     begin
@@ -328,7 +328,7 @@ begin
           SetTextA(l1, i + 1, s2);
           l1 := l1 + Length(s2);
           FGPen := OldPen;
-          BGPen := Blue;
+          BGPen := GetColor(BackgroundColor);
           SetTextA(l1, i + 1, s1);
         end
         else
@@ -358,7 +358,7 @@ begin
     StartByte := NumBytesPerLine * LongWord(FStartLine);
     pl := Buffer;
     Inc(pl, StartByte);
-    BGPen := Blue;
+    BGPen := GetColor(BackgroundColor);
 
     for i := 0 to EndScreen do
     begin
@@ -379,7 +379,7 @@ begin
             if IsByteSelected(cb + j) then
               BGPen := Cyan;
             SetText(cx, i + 1, s);
-            BGPen := Blue;
+            BGPen := GetColor(BackgroundColor);
             SetText(cx + 2, i + 1, ' ');
             Inc(cx, 3);
             if IsByteSelected(cb + j) then
@@ -388,7 +388,7 @@ begin
               SetChar(OffsetForChars + j, i + 1, Char(Pl^))
             else
               SetChar(OffsetForChars + j, i + 1, '.');
-            BGPen := Blue;
+            BGPen := GetColor(BackgroundColor);
             if (j + 1) mod 4 = 0 then
             begin
               SetChar(cx, i + 1, VLine);
@@ -397,7 +397,7 @@ begin
           end
           else
           begin
-            BGPen := Blue;
+            BGPen := GetColor(BackgroundColor);
             SetText(cx, i + 1, '   ');
             Inc(cx, 3);
             SetChar(OffsetForChars + j, i + 1, ' ');

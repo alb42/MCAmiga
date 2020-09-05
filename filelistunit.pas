@@ -196,7 +196,7 @@ var
 implementation
 
 uses
-  DialogUnit, EventUnit, ViewerUnit, ToolsUnit;
+  DialogUnit, EventUnit, ViewerUnit, ToolsUnit, Colorunit;
 
 
 procedure RecurseDirs(BasePath, AName: string; FL: TEntryList; var Dirs: Integer; var Files: Integer; var Size: Int64); forward;
@@ -435,8 +435,8 @@ var
   MaxLen: LongInt;
 begin
   // atm fixed colors
-  FGPen := LightGray;
-  BGPen := Blue;
+  FGPen := GetColor(BorderColor);
+  BGPen := GetColor(BackgroundColor);
   // write the edges
   SetChar(FRect.Left, FRect.Top, UpperLeftEdge);
   SetChar(FRect.Left, FRect.Bottom, LowerLeftEdge);
@@ -474,8 +474,8 @@ begin
   begin
     SetChar(FRect.Left + 2, FRect.Top, LeftEdge);
     SetChar(FRect.Left + 3 + Length(s) , FRect.Top, RightEdge);
-    FGPen := Blue;
-    BGPen := LightGray;
+    FGPen := GetColor(BackgroundColor);
+    BGPen := GetColor(BorderColor);
     SetTextA(FRect.Left + 3, FRect.Top, s);
   end
   else
@@ -490,8 +490,8 @@ begin
   // Draw screen flip button in the upper right edge
   if FullScreen and (FRect.Left > 0) then
   begin
-    BGPen := Blue;
-    FGPen := LightGray;
+    BGPen := GetColor(BackgroundColor);
+    FGPen := GetColor(BorderColor);
     SetTextA(ScreenWidth - 3, 0, LeftEdge + #8 + VertLine);
   end;
 end;
@@ -539,11 +539,8 @@ var
 begin
   if ShowClock then
   begin
-    FGPen := LightGray;
-    if DefShowMenu then
-      BGPen := Black
-    else
-      BGPen := Blue;
+    FGPen := GetColor(BorderColor);
+    BGPen := GetColor(BackgroundColor);
     s := FormatDateTime('hh:mm', Now());
     if FullScreen then
       SetText((ScreenWidth - Length(s) - 3), 0, s)
@@ -596,8 +593,8 @@ var
   AE: TArchiveEntry;
   ListToGet: LongWord;
 begin
-  FGPen := LightGray;
-  BGPen := Blue;
+  FGPen := GetColor(BorderColor);
+  BGPen := GetColor(BackgroundColor);
   // updating contents
   if UpdateList then
   begin
@@ -805,13 +802,13 @@ begin
   // active, other color
   if FIsActive and (Idx = FActiveElement) then
   begin
-    FGPen := Blue;
-    BGPen := Brown;
+    FGPen := GetColor(BackgroundColor);
+    BGPen := GetColor(SelBackColor);
   end
   else
   begin
-    FGPen := LightGray;
-    BGPen := Blue;
+    FGPen := GetColor(SelNActiveColor);
+    BGPen := GetColor(BackgroundColor);
   end;
   // check if in list
   l := 0;
@@ -820,24 +817,26 @@ begin
     // specialized colors for every type and selected
     if FFileList[Idx].Selected then
     begin
-      FGPen := Yellow;
-      col := Yellow;
+      FGPen := GetColor(SelectedColor);
+      col := GetColor(SelectedColor);
     end
     else
     case FFileList[Idx].EType of
-      etFile: col := Cyan;
-      etDir:    col := White;
-      etParent: col := LightGray;
-      etDrive:  col := White;
-      etAssign: col := LightGray;
+      etFile:   col := GetColor(FileColor);
+      etDir:    col := GetColor(DirColor);
+      etParent: col := GetColor(DirColor);
+      etDrive:  col := GetColor(DirColor);
+      etAssign: col := GetColor(AssignColor);
     end;
     // invert color when focussed entry
     if Idx = FActiveElement then
     begin
       if FIsActive then
-        BGPen := col and $F                            // make sure it's not blinking ;)
+      begin
+        BGPen := GetColor(SelectedBGColor) and $f;           // make sure it's not blinking ;)
+      end
       else
-        FGPen := LightGray;
+        FGPen := GetColor(SelFrontColor);
     end
     else
       FGPen := col;
@@ -869,8 +868,8 @@ begin
     for n := 0 to FInnerRect.Width - l do
       SetChar(FInnerRect.Left + l + n, FInnerRect.Top + Idx - FTopElement, ' ');
   // reset colors to default
-  FGPen := LightGray;
-  BGPen := Blue;
+  FGPen := GetColor(BorderColor);
+  BGPen := GetColor(BackgroundColor);
 end;
 
 // Extract Files from Archive file
@@ -1064,8 +1063,8 @@ begin
     end;
   end;
   // drawing
-  BGPen := Blue;
-  FGPen := LightGray;
+  BGPen := GetColor(BackgroundColor);
+  FGPen := GetColor(BorderColor);
   // delete the old entry
   for i := FRect.Left + 1 to FRect.Right - 1 do
     SetChar(i, FRect.Bottom - 2, SingleLine);

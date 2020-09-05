@@ -834,7 +834,7 @@ begin
       end;
       Text := LimitName(Text, w - 10, False);
       p := w div 2 - Length(Text) div 2 + 5;
-      SetTextA(p, Pup - 2, Text);
+      SetTextA(PGL + p, Pup - 2, Text);
     end;
     if Text2 <> '' then
     begin
@@ -951,7 +951,7 @@ begin
       end;
       Text := LimitName(Text, w - 10, False);
       p := w div 2 - Length(Text) div 2;
-      SetTextA(p, Pup - 1, Text);
+      SetTextA(PGL + p, Pup - 1, Text);
     end;
     UpdateScreen(False);
   end;
