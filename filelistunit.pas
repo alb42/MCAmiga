@@ -583,7 +583,6 @@ end;
 // since it's placed into own DrawEntry routine
 procedure TFileList.DrawContents(UpdateList: Boolean);
 var
-  Info: TSearchRec;
   i: Integer;
   s: string;
   Parts: TStringList;
@@ -592,6 +591,9 @@ var
   CDir: TArchiveDir;
   AE: TArchiveEntry;
   ListToGet: LongWord;
+  ib: TFileInfoBlock;
+  DirLock: BPTR;
+  Res: Boolean;
 begin
   FGPen := GetColor(BorderColor);
   BGPen := GetColor(BackgroundColor);
@@ -681,26 +683,33 @@ begin
       end
       else
       begin    // not an archive and valid path, read directory
-        if FindFirst(IncludeTrailingPathDelimiter(FCurrentPath) + '*', faAnyFile and faDirectory, Info) = 0 then
+        DirLock := AmigaDOS.Lock(PChar(FCurrentPath), ACCESS_READ);
+        if NativeInt(DirLock) <> 0 then
         begin
-          repeat
-            NEntry := TListEntry.Create;
-            // Dir
-            if (Info.Attr and faDirectory) <> 0 then
-            begin
-              NEntry.Name := IncludeTrailingPathDelimiter(Info.Name);
-              NEntry.EType := etDir;
-            end
-            else // File
-            begin
-              NEntry.Name := Info.Name;
-              NEntry.EType := etFile;
-              NEntry.Size := Info.Size;
-            end;
-            //
-            FFileList.Add(NEntry);
-          until FindNext(info) <> 0;
-          FindClose(Info);
+          if LongBool(Examine(DirLock, @ib)) then
+          begin
+            repeat
+              Res := LongBool(ExNext(DirLock, @ib));
+              if not Res then
+                break;
+              NEntry := TListEntry.Create;
+              // Dir
+              if ib.fib_DirEntryType > 0 then
+              begin
+                NEntry.Name := IncludeTrailingPathDelimiter(ib.fib_FileName);
+                NEntry.EType := etDir;
+              end
+              else // File
+              begin
+                NEntry.Name := ib.fib_FileName;
+                NEntry.EType := etFile;
+                NEntry.Size := ib.fib_Size;
+              end;
+              //
+              FFileList.Add(NEntry);
+            until False;
+            Unlock(DirLock);
+          end;
         end;
       end;
     end;
