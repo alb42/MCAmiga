@@ -122,6 +122,13 @@ MCAmiga diff file1 file2
 History:
 ########
 
+0.9
+- difference viewer in tools menu
+- basic highlighter for ini, patch/diff files
+- BugFix for start from WBDock2
+- startup scripts to directly start the viewer/diffviewer from shell
+- Bugfix for file size
+
 0.8
 - Bugfix Move from archive
 - lynx type movement
