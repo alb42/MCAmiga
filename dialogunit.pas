@@ -1203,7 +1203,7 @@ begin
       BGPen := Cyan
     else
       BGPen := LightGray;
-    SetTextA(ButtonsArray[i].Rect.Left, ButtonsArray[i].Rect.Top, LBorder + ButtonsArray[i].Title + RBorder);
+    SetText(ButtonsArray[i].Rect.Left, ButtonsArray[i].Rect.Top, LBorder + ButtonsArray[i].Title + RBorder);
   end;
   BGPen := LightGray;
   UpdateScreen(False);

@@ -7,7 +7,7 @@ uses
   {$if defined(Amiga68k) or defined(MorphOS) or defined(AROS)}
   xad, xadarchive,
   {$endif}
-  FileListUnit, dialogunit, EventUnit, archiveunit, ViewerUnit, diffviewerunit, colorunit;
+  FileListUnit, dialogunit, EventUnit, archiveunit, ViewerUnit, diffviewerunit, colorunit, LoggingUnit;
 
 var
   Src: TFileList;
@@ -388,7 +388,7 @@ begin
     // Editor
     EditLink := GetStrToolType(DObj, 'EDITOR', EditLink);
     AltEditLink := GetStrToolType(DObj, 'EDITOR2', AltEditLink);
-    // Defaults                                          but with th
+    // Defaults
     LeftDefaultPath := GetStrToolType(DObj, 'LEFT', LeftDefaultPath);
     RightDefaultPath := GetStrToolType(DObj, 'RIGHT', RightDefaultPath);
     // WithDevices
@@ -407,6 +407,9 @@ begin
     ShowClock := GetStrToolType(DObj, 'SHOWCLOCK', '0') = '';
     //
     WindowSize := GetStrToolType(DObj, 'WINDOW', '');
+    //
+    LogEnabled := GetStrToolType(DObj, 'LOG', '0') = '';
+    if LogEnabled then LogOut('Log Enabled at ' + DateTimeToStr(Now));
     ParseWinSize;
     //
     FreeDiskObject(DObj);

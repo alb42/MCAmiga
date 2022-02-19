@@ -5,7 +5,7 @@ unit toolsunit;
 interface
 
 uses
-  Classes, SysUtils;
+  Classes, SysUtils, Exec, AmigaDOS;
 // recursively create the directories
 procedure CreateAllDir(AName: string);
 // Recursively Delete a complete Temp directory (contents and directory)
@@ -50,28 +50,94 @@ end;
 
 procedure ConvertChar(var c: Char); inline;
 begin
+  // https://en.wikipedia.org/wiki/Code_page_437
   case c of
+    // line 8
     #$C7: c := #128; // C
     #$FC: c := #129; // ue
-    #$DC: c := #154; // UE
+    #$E9: c := #130; // e'
+    #$E2: c := #131; // a^
     #$E4: c := #132; // ae
+    #$E0: c := #133; // a`
+    #$E5: c := #134; // a°
+    #$e7: c := #135; // c
+    #$ea: c := #136; // e^
+    #$eb: c := #137; // ee
+    #$E8: c := #138; // e`
+    #$ef: c := #139; // ie
+    #$ee: c := #140; // i^
+    #$ec: c := #141; // i`
     #$C4: c := #142; // AE
+    // line 9
+    #$C9: c := #144; // Ee
+    #$e6: c := #145; // a-e
+    #$c6: c := #146; // A-E
+    #$F4: c := #147; // o^
     #$F6: c := #148; // oe
+    #$F2: c := #149; // o`
+    #$FB: c := #150; // u^
+    #$F9: c := #151; // u`
+    #$FF: c := #152; // ye
     #$D6: c := #153; // OE
+    #$DC: c := #154; // UE
+    #$A2: c := #155; // cent
+    #$A3: c := #156; // Pound
+    #$A5: c := #157; // Yen
+    // line A
+    #$E1: c := #160; // a'
+    #$ED: c := #161; // i'
+    #$F3: c := #162; // o'
+    #$FA: c := #163; // u'
+    #$F1: c := #164; // n~
+    #$D1: c := #165; // N~
+    // line E
     #$DF: c := #225; // sz
+
   end;
 end;
 
 procedure ConvertCharBack(var c: Char); inline;
 begin
   case c of
+    // line 8
     #128: c := #$C7; // C
     #129: c := #$FC; // ue
-    #154: c := #$DC; // UE
+    #130: c := #$E9; // e'
+    #131: c := #$E2; // a^
     #132: c := #$E4; // ae
+    #133: c := #$E0; // a`
+    #134: c := #$E5; // a°
+    #135: c := #$e7; // c
+    #136: c := #$ea; // e^
+    #137: c := #$eb; // ee
+    #138: c := #$E8; // e`
+    #139: c := #$ef; // ie
+    #140: c := #$ee; // i^
+    #141: c := #$ec; // i`
     #142: c := #$C4; // AE
+    // line 9
+    #144: c := #$C9; // Ee
+    #145: c := #$e6; // a-e
+    #146: c := #$c6; // A-E
+    #147: c := #$F4; // o^
     #148: c := #$F6; // oe
+    #149: c := #$F2; // o`
+    #150: c := #$FB; // u^
+    #151: c := #$F9; // u`
+    #152: c := #$FF; // ye
     #153: c := #$D6; // OE
+    #154: c := #$DC; // UE
+    #155: c := #$A2; // cent
+    #156: c := #$A3; // Pound
+    #157: c := #$A5; // Yen
+    // line A
+    #160: c := #$E1; // a'
+    #161: c := #$ED; // i'
+    #162: c := #$F3; // o'
+    #163: c := #$FA; // u'
+    #164: c := #$F1; // n~
+    #165: c := #$D1; // N~
+    // line E
     #225: c := #$DF; // sz
   end;
 end;
@@ -92,7 +158,7 @@ begin
     else
       Name := IncludeTrailingPathDelimiter(Name) + SL[i];
     if not FileExists(Name) then
-      CreateDir(Name);
+      SysUtils.CreateDir(Name);
   end;
   SL.Free;
 end;
@@ -118,15 +184,16 @@ end;
 
 function GetFileSize(const Name: string): Int64;
 var
-  SRec: TSearchRec;
+  ib: TFileInfoBlock;
+  DirLock: BPTR;
 begin
-  if FindFirst(name, faAnyfile, SRec) = 0 then
-  begin
-    Result := SRec.Size;
-    FindClose(SRec);
-  end
-  else
-    Result := -1;
+  Result := -1;
+  DirLock := Lock(PChar(Name), ACCESS_READ);
+  if NativeInt(DirLock) = 0 then
+    Exit;
+  if LongBool(Examine(DirLock, @ib)) then
+    Result := ib.fib_Size;
+  Unlock(DirLock);
 end;
 
 function OverwriteText(Src, dest: string): string;

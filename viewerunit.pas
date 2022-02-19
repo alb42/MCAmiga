@@ -471,7 +471,7 @@ begin
   else
   if Mode = vmHex then
   begin
-    FStartLine := Min(FStartLine, (NumBytes div NumBytesPerLine) - 1 - Offset);
+    FStartLine := Min(Int64(FStartLine), Int64(NumBytes div NumBytesPerLine) - 1 - Offset);
     Paint;
   end;
 end;

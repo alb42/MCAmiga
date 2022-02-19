@@ -7,7 +7,7 @@ interface
 uses
   AmigaDOS, Exec, Utility, Intuition,
   Video, Keyboard, Classes, SysUtils, Math, fgl, StrUtils, Mouse,
-  ArchiveUnit;
+  ArchiveUnit, LoggingUnit;
 
 
 type
@@ -185,6 +185,9 @@ type
   // write a Text to the Video screen at x,y in x direction
   procedure SetText(x,y: Integer; s: string);
   procedure SetTextA(x,y: Integer; s: string);
+
+  function ConvertString(s: string): string;
+
   // cut the filename to fit into MaxLength, replace the cutted text with '...', when Pathmode, let the start of path stay
   function LimitName(AName: string; MaxLength: Integer; PathMode: Boolean = False): string;
   // get a temp file name
@@ -308,6 +311,21 @@ begin
     ConvertChar(c);
     SetChar(x + i - 1, y, c);
   end;
+end;
+
+function ConvertString(s: string): string;
+var
+  i: Integer;
+  c: Char;
+begin
+  Result := '';
+  for i := 1 to Length(s) do
+  begin
+    c := s[i];
+    ConvertChar(c);
+    Result := Result + c;
+  end;
+
 end;
 
 { TPaintedClass }
@@ -479,7 +497,7 @@ begin
     SetTextA(FRect.Left + 3, FRect.Top, s);
   end
   else
-    SetTextA(FRect.Left + 2, FRect.Top, LeftEdge + s + RightEdge);
+    SetText(FRect.Left + 2, FRect.Top, LeftEdge + ConvertString(s) + RightEdge);
   // count selected files and count bytes and draw below the contents
   CheckSelected;
   // redraw the menu if needed, always the current panel draws also the bottom menu
@@ -492,7 +510,7 @@ begin
   begin
     BGPen := GetColor(BackgroundColor);
     FGPen := GetColor(BorderColor);
-    SetTextA(ScreenWidth - 3, 0, LeftEdge + #8 + VertLine);
+    SetText(ScreenWidth - 3, 0, LeftEdge + #8 + VertLine);
   end;
 end;
 
@@ -536,17 +554,20 @@ end;
 procedure TFileList.DrawClock;
 var
   s: string;
+  xl: Integer;
 begin
   if ShowClock then
   begin
     FGPen := GetColor(BorderColor);
     BGPen := GetColor(BackgroundColor);
-    s := FormatDateTime('hh:mm', Now());
+    s := FormatDateTime('hh:mm:ss', Now());
     if FullScreen then
-      SetText((ScreenWidth - Length(s) - 3), 0, s)
+      xl := ScreenWidth - Length(s) - 3
     else
-      SetText((ScreenWidth - Length(s)), 0, s);
-    UpdateScreen(False);
+      xl := ScreenWidth - Length(s);
+    SetText(xl, 0, s);
+    //UpdateScreen(False);
+    UpdateScreenArea(xl, 0, xl + Length(s), 0, True);
   end;
 end;
 
@@ -1443,14 +1464,14 @@ begin
   Path := IncludeTrailingPathDelimiter(AName);
   if Assigned(CountPG) then
     CountPG.UpdateValue(0, BasePath + Path + ' ' + IntToStr(Files + Dirs));
-  DirLock := Lock(BasePath + AName, ACCESS_READ);
+  DirLock := Lock(PChar(BasePath + AName), ACCESS_READ);
   if NativeInt(DirLock) = 0 then
     Exit;
   try
     if LongBool(Examine(DirLock, @ib)) then
     begin
       repeat
-        if not ExNext(DirLock, @ib) then
+        if not LongBool(ExNext(DirLock, @ib)) then
           Break;
         if ib.fib_DirEntryType > 0 then
         begin
@@ -2379,11 +2400,13 @@ begin
     //check if we can use the shortcut move
     SrcLock := Lock(PChar(ExcludeTrailingPathDelimiter(FCurrentPath)), SHARED_LOCK);
     DestLock := Lock(PChar(ExcludeTrailingPathDelimiter(Target)), SHARED_LOCK);
-    IsSameDevice := SameDevice(SrcLock, DestLock);
+    IsSameDevice := SameLock(SrcLock, DestLock) = LOCK_SAME_HANDLER;
+    if LogEnabled then LogOut('Move from "'+FCurrentPath+'" to "' + Target + '" is same device: ' + BoolToStr(IsSameDevice, True));
     Unlock(SrcLock);
     UnLock(DestLock);
     if IsSameDevice then
     begin
+      if LogEnabled then LogOut('Move directly');
       DoListOfSelectedFile(False, FL, dirs, files, Size);
       if AskQuestion('Move ' + IfThen(dirs > 0, IntToStr(Dirs) + ' directories and ', '') + IntToStr(Files) + ' Files (' + Trim(FormatSize(Size))  + 'byte)? ') then
       begin
@@ -2410,7 +2433,11 @@ begin
           if FL[i].EType in [etDir, etFile] then
           begin
             PG.UpdateValue(i, FL[i].Name);
-            SysUtils.RenameFile(IncludeTrailingPathDelimiter(FCurrentPath) + ExcludeTrailingPathDelimiter(FL[i].Name), IncludeTrailingPathDelimiter(Target) + ExcludeTrailingPathDelimiter(FL[i].Name));
+            if LogEnabled then LogOut('Do Rename "' + IncludeTrailingPathDelimiter(FCurrentPath) + ExcludeTrailingPathDelimiter(FL[i].Name) + '" to "' + IncludeTrailingPathDelimiter(Target) + ExcludeTrailingPathDelimiter(FL[i].Name) + '" ');
+            if SysUtils.RenameFile(IncludeTrailingPathDelimiter(FCurrentPath) + ExcludeTrailingPathDelimiter(FL[i].Name), IncludeTrailingPathDelimiter(Target) + ExcludeTrailingPathDelimiter(FL[i].Name)) then
+              if LogEnabled then LogOut('Rename successful')
+            else
+              if LogEnabled then LogOut('Rename failed');
           end;
         end;
         Update(True);
@@ -2420,6 +2447,7 @@ begin
     end;
     FL.Clear;
     // make a list of all
+    if LogEnabled then LogOut('Make list to move');
     DoListOfSelectedFile(True, FL, dirs, files, Size);
     if FL.Count > 0 then
     begin
@@ -2448,6 +2476,7 @@ begin
               if not AskQuestion('File "' + FL[0].Name +'" already exists, Overwrite?'#13#10 + OverwriteText(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name, IncludeTrailingPathDelimiter(Target) + FL[0].Name)) then
                 Exit;
             end;
+            if LogEnabled then LogOut('1. step of move, copy ' + IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name + ' to ' + IncludeTrailingPathDelimiter(Target) + FL[0].Name);
             Src := TFileStream.Create(IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name, fmOpenRead);
             Dest := TFileStream.Create(IncludeTrailingPathDelimiter(Target) + FL[0].Name, fmCreate);
             NumBytes := 0;
@@ -2474,6 +2503,7 @@ begin
           except
             on E:Exception do
             begin
+              LogOut('Exception move file ' + IncludeTrailingPathDelimiter(FCurrentPath) + FL[0].Name + ' to ' + IncludeTrailingPathDelimiter(Target) + FL[0].Name + ' ' + E.Message);
               Src.Free;
               Src := nil;
               // only delete the file if the dest was created ;)
@@ -2553,6 +2583,7 @@ begin
                       ;
                   end;
                 end;
+                if LogEnabled then LogOut('1. step of move, copy files ' + IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name + ' to ' + NewName);
                 Src := TFileStream.Create(IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name, fmOpenRead);
                 Dest := TFileStream.Create(NewName, fmCreate);
                 repeat
@@ -2580,6 +2611,7 @@ begin
             except
               on E:Exception do
               begin
+                LogOut('Exception move file ' + IncludeTrailingPathDelimiter(FCurrentPath) + FL[i].Name + ' to ' + NewName + ' ' + E.Message);
                 Src.Free;
                 Src := nil;
                 Dest.Free;
@@ -2603,6 +2635,7 @@ begin
         end
         else
         begin
+          if LogEnabled then LogOut('2. step move delete files');
           for i := FL.Count - 1 downto 0 do
             DeleteFile(IncludeTrailingPathDelimiter(FCurrentPath) + ExcludeTrailingPathDelimiter(FL[i].Name));
         end;

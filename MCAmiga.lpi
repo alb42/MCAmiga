@@ -90,6 +90,11 @@
         <Filename Value="colorunit.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
+      <Unit>
+        <Filename Value="loggingunit.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="LoggingUnit"/>
+      </Unit>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
@@ -111,6 +116,9 @@
         <UseLineInfoUnit Value="False"/>
       </Debugging>
     </Linking>
+    <Other>
+      <CustomOptions Value="-XV -Avasm"/>
+    </Other>
   </CompilerOptions>
   <Debugging>
     <Exceptions>
