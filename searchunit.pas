@@ -275,7 +275,7 @@ begin
     SetChar(InnerRect.Right, InnerRect.Bottom, ArrowDown);
   //
   DrawButtons;
-  UpdateScreen(False);
+  UpdateScreenArea(WindowRect.Left, WindowRect.Top, WindowRect.Right, WindowRect.Bottom, False);
 end;
 
 procedure TSearchShowWin.ConfigureButtons;
@@ -781,7 +781,7 @@ begin
     else
       Exit;
   end;
-  c := GetKeyEventChar(Key);
+  c := Chr(Key and $FF);
   case c of
     #32..#126, #$C7, #$FC, #$DC, #$E4, #$C4, #$F6, #$D6, #$DF: begin
       if (CurPos >= 0) and (Length(s) < 60) then
@@ -944,8 +944,7 @@ begin
     BGPen := LightGray;
   SetText(Mid.X + 2, WindowRect.Bottom, LBorder + 'Cancel' + RBorder);
 
-
-  UpdateScreen(False);
+  UpdateScreenArea(WindowRect.Left, WindowRect.Top, WindowRect.Right, WindowRect.Bottom, False);
 end;
 
 constructor TSearchClass.Create;

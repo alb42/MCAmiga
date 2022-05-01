@@ -560,14 +560,13 @@ begin
   begin
     FGPen := GetColor(BorderColor);
     BGPen := GetColor(BackgroundColor);
-    s := FormatDateTime('hh:mm:ss', Now());
+    s := FormatDateTime('hh:mm', Now());
     if FullScreen then
       xl := ScreenWidth - Length(s) - 3
     else
       xl := ScreenWidth - Length(s);
     SetText(xl, 0, s);
-    //UpdateScreen(False);
-    UpdateScreenArea(xl, 0, xl + Length(s), 0, True);
+    UpdateScreenArea(xl, 0, xl + Length(s), 0, False);
   end;
 end;
 
@@ -762,7 +761,6 @@ begin
     FIsActive := AValue;
   DrawBorder(); // must draw border because of top text
   DrawActive(FActiveElement); // draw active
-  UpdateScreen(False); // do the update
 end;
 
 // draw the active Entry
@@ -782,8 +780,9 @@ begin
     end;
     for i := FTopElement to FBottomElement do
       DrawEntry(i);
-    UpdateScreen(False);
-    Exit;
+    //UpdateScreen(False);
+    //UpdateScreenArea(FRect.Left, FRect.Top, FRect.Right, FRect.Bottom, False); // do the update
+    //Exit;
   end;
   if FActiveElement > FBottomElement then
   begin
@@ -794,7 +793,9 @@ begin
     end;
     for i := FTopElement to FBottomElement do
       DrawEntry(i);
-    UpdateScreen(False);
+    //UpdateScreen(False);
+    //UpdateScreenArea(FRect.Left, FRect.Top, FRect.Right, FRect.Bottom, False); // do the update
+    //Exit;
   end;
 
   if FActiveElement <> OldActive then
@@ -816,7 +817,7 @@ begin
   for n := 0 to FInnerRect.Width - l do
     SetChar(FInnerRect.Left + l + n, FRect.Bottom - 1, ' ');
 
-  UpdateScreen(False);
+  UpdateScreenArea(FRect.Left, FRect.Top, FRect.Right, FRect.Bottom, False); // do the update
 end;
 
 // Draw Entry by Index
@@ -1107,7 +1108,7 @@ begin
     SetText(FRect.Right - 1 - Length(st), FRect.Bottom - 2, st);
   end;
   // repaint
-  UpdateScreen(False);
+  UpdateScreenArea(FRect.Left, FRect.Top, FRect.Right, FRect.Bottom, False); // do the update
 end;
 
 // basic create
@@ -1157,7 +1158,10 @@ begin
   DrawContents(UpdateList);
   DrawActive(ActiveElement);
   CheckSelected;
-  UpdateScreen(False);
+  if DefShowMenu and IsActive then
+    UpdateScreenArea(FRect.Left, FRect.Top, FRect.Right, FRect.Bottom + 1, False)
+  else
+    UpdateScreenArea(FRect.Left, FRect.Top, FRect.Right, FRect.Bottom, False)
 end;
 
 // Go To parent dir
@@ -1815,10 +1819,10 @@ begin
     Key := GetNextKeyEvent;
     if (Key and $FFFF) <> 0 then
     begin
-      C := GetKeyEventChar(Key);
+      C := Chr(Key and $FF);
       if c <> #0 then
       begin
-        if c = #9 then
+        if c in [#9,#10,#13,#27] then
         begin
           c := #0;
           Break;
@@ -1865,7 +1869,7 @@ begin
             SetChar(i, FRect.Bottom - 1, ' ');
           SetCursorPos(FInnerRect.Left + Length(NSearchName), FRect.Bottom - 1);
           SetTextA(FinnerRect.Left, FRect.Bottom - 1, NSearchName);
-          UpdateScreen(False);
+          UpdateScreenArea(FInnerRect.Left, FInnerRect.Top, FInnerRect.Right, FRect.Bottom, False); // do the update
         end;
       end;
       // leave on all not char characters

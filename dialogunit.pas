@@ -609,7 +609,7 @@ begin
     s := s + Space(Max(0, InnerRect.Width - AbsLen - 1));
     SetTextA(InnerRect.Left + 2, InnerRect.Top + i, s);
   end;
-  UpdateScreen(False);
+  UpdateScreenArea(WindowRect.Left, WindowRect.Top, WindowRect.Right, WindowRect.Bottom, False);
 end;
 
 constructor TToolsMenu.Create;
@@ -641,7 +641,7 @@ begin
     Key := PollNextKey;
     if Finished then
       Break;
-    c := GetKeyEventChar(Key);
+    c := Chr(Key and $FF);
     if c in ['1'..'9'] then
     begin
       i := StrToInt(c) - 1;
@@ -780,7 +780,7 @@ begin
     MaxValue2 := 1;
   // draw Buttons
   DrawButtons;
-  UpdateScreen(False);
+  UpdateScreenArea(WindowRect.Left, WindowRect.Top, WindowRect.Right, WindowRect.Bottom, False);
 end;
 
 function TDoubleProgress.Execute: TDialogResult;
@@ -846,7 +846,7 @@ begin
       p := (PGR - 2) - Length(Text2);
       SetTextA(p, Pup, Text2);
     end;
-    UpdateScreen(False);
+    UpdateScreenArea(WindowRect.Left, WindowRect.Top, WindowRect.Right, WindowRect.Bottom, False);
   end;
   Key := PollNextKey;
   // Break on Enter -> Cancel
@@ -893,7 +893,8 @@ begin
 
   // draw Buttons
   DrawButtons;
-  UpdateScreen(False);
+  // faster redraw only update the area of the new dialog window
+  UpdateScreenArea(WindowRect.Left, WindowRect.Top, WindowRect.Right, WindowRect.Bottom, False);
 end;
 
 procedure TSingleProgress.ProcessMouse(MouseEvent: TMouseEvent);
@@ -953,7 +954,7 @@ begin
       p := w div 2 - Length(Text) div 2;
       SetTextA(PGL + p, Pup - 1, Text);
     end;
-    UpdateScreen(False);
+    UpdateScreenArea(WindowRect.Left, WindowRect.Top, WindowRect.Right, WindowRect.Bottom, False);
   end;
   Key := PollNextKey;
   // Break on Enter -> Cancel
@@ -1012,7 +1013,7 @@ begin
   FGPen := Black;
   BGPen := LightGray;
   DrawButtons;
-  UpdateScreen(False);
+  UpdateScreenArea(WindowRect.Left, WindowRect.Top, WindowRect.Right, WindowRect.Bottom, False);
 end;
 
 function TAskForName.Execute: TDialogResult;
@@ -1054,7 +1055,7 @@ begin
           SetTextA(TxtL, Mid.y, Newname);
           SetChar(TxtL + Length(NewName), Mid.y, ' ');
           SetCursorPos(CursorX, Mid.Y);
-          UpdateScreen(False);
+          UpdateScreenArea(TxtL, Mid.y, TxtL  + Length(NewName) + 1, Mid.y, False);
         end;
       end;
       $1C0D, $000D: begin
@@ -1073,7 +1074,7 @@ begin
       end
       else
       begin
-        c := GetKeyEventChar(Key);
+        c := Chr(Key and $FF);
         case c of
           #32..#252: begin
             ConvertCharBack(c);
@@ -1091,7 +1092,7 @@ begin
                   FGPen := LightGray;
                   SetTextA(TxtL, Mid.y, Newname);
                   SetCursorPos(CursorX + 1, Mid.Y);
-                  UpdateScreen(False);
+                  UpdateScreenArea(TxtL, Mid.y, TxtL  + Length(NewName) + 1, Mid.y, False);
                 end;
               end;
             end;
@@ -1106,7 +1107,7 @@ begin
               SetTextA(TxtL, Mid.y, Newname);
               SetChar(TxtL + Length(NewName), Mid.y, ' ');
               SetCursorPos(CursorX - 1, Mid.Y);
-              UpdateScreen(False);
+              UpdateScreenArea(TxtL, Mid.y, TxtL  + Length(NewName) + 1, Mid.y, False);
             end;
           end;
         end
@@ -1194,9 +1195,11 @@ end;
 procedure TShowMessage.DrawButtons;
 var
   i: Integer;
+  LRect: TRect;
 begin
   ConfigureButtons;
   FGPen := Black;
+  LRect := TRect.Empty;
   for i := 0 to High(ButtonsArray) do
   begin
     if SelectedButton = i then
@@ -1204,9 +1207,19 @@ begin
     else
       BGPen := LightGray;
     SetText(ButtonsArray[i].Rect.Left, ButtonsArray[i].Rect.Top, LBorder + ButtonsArray[i].Title + RBorder);
+    if i = 0 then
+      LRect := ButtonsArray[i].Rect
+    else
+    begin
+      LRect.Left := Min(ButtonsArray[i].Rect.Left, LRect.Left);
+      LRect.Right := Max(ButtonsArray[i].Rect.Right, LRect.Right);
+      LRect.Top := Min(ButtonsArray[i].Rect.Top, LRect.Top);
+      LRect.Bottom := Max(ButtonsArray[i].Rect.Bottom, LRect.Bottom);
+    end;
   end;
   BGPen := LightGray;
-  UpdateScreen(False);
+  if not LRect.IsEmpty then
+    UpdateScreenArea(LRect.Left, LRect.Top, LRect.Right, LRect.Bottom, False);
 end;
 
 procedure TShowMessage.ConfigureButtons;
@@ -1291,7 +1304,7 @@ begin
 
   // draw Buttons
   DrawButtons;
-  UpdateScreen(False);
+  UpdateScreenArea(WindowRect.Left, WindowRect.Top, WindowRect.Right, WindowRect.Bottom, False);
 end;
 
 procedure TShowMessage.ProcessMouse(MouseEvent: TMouseEvent);

@@ -185,6 +185,8 @@ begin
       ClearScreen;
       Left.Resize(Rect(0, 0, (ScreenWidth div 2) - 1, ScreenHeight - 1));
       Right.Resize(Rect((ScreenWidth div 2), 0, ScreenWidth - 1, ScreenHeight - 1));
+      Left.Update(False);
+      Right.Update(False);
       UnLockScreenUpdate;
       UpdateScreen(False);
     end;
