@@ -108,6 +108,10 @@ SHOWCLOCK show a clock in the lower right edge
 
 WINDOW=  default window size at startup, separated with "/" Left/Top/Width/Height e.g. WINDOW=0/0/640/480
 
+RUNSTACK=  default stack size for starting external program from MCAmiga (via Enter or Shift Enter)
+
+LOG record log output for easier bug finding (not very much messages included until now, only for move and program starting)
+
 Command-Line:
 #############
 
@@ -121,6 +125,11 @@ MCAmiga diff file1 file2
 
 History:
 ########
+
+1.0
+- faster redrawing (define area of screen to update, new FPC feature, needs latest FPC)
+- clock with seconds (possible because of faster redrawing)
+- RUNSTACK TollType to set stacksize for starting external programs
 
 0.9
 - difference viewer in tools menu

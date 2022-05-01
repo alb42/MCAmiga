@@ -408,6 +408,8 @@ begin
     //
     WindowSize := GetStrToolType(DObj, 'WINDOW', '');
     //
+    StartStack := StrToIntDef(GetStrToolType(DObj, 'RUNSTACK', '0'), 0);
+    //
     LogEnabled := GetStrToolType(DObj, 'LOG', '0') = '';
     if LogEnabled then LogOut('Log Enabled at ' + DateTimeToStr(Now));
     ParseWinSize;

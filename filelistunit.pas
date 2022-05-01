@@ -50,6 +50,7 @@ var
   AutoInfo: Boolean = False;     // do not ask for info action, just do it
   AutoCreateInfo: Boolean = False; // Automatically create icon for new dirs
   ShowClock: Boolean = True;
+  StartStack: Integer = 0;  // Stack for starting programs from MCAmiga
 
 type
   TEntryType = (etParent, etDir, etFile, etDrive, etAssign); // types of entries in the panel, do not change, sorting depend on it
@@ -1188,9 +1189,10 @@ end;
 procedure TFileList.EnterPressed(WithShiftPressed: Boolean; AllowExec: Boolean = True);
 var
   s, Params: string;
-  Ret: LongInt;
+  Ret, NewStackSize: LongInt;
   ToChange: TFileList;
   cmd: string;
+  MyTask: pTask;
 begin
   // shift open it on other side
   if WithShiftPressed then
@@ -1243,8 +1245,18 @@ begin
               // Full Screen, bring WB to Front
               if FullScreen then
                 WBenchToFront;
+              // check stack setting
+              MyTask := FindTask(nil);
+              NewStackSize := 0;
+              if Assigned(MyTask) then
+                NewStackSize := Abs(Integer(MyTask^.tc_SPUpper - MyTask^.tc_SPLower));
+              if StartStack > NewStackSize then
+                NewStackSize := StartStack;
+              if NewStackSize < 10240 then
+                NewStackSize := 10240;
               // do it
-              Ret := SystemTags(PChar(cmd), [TAG_END]);
+              if LogEnabled then LogOut('Start program "' + cmd + '" with stacksize: ' + IntToStr(NewStackSize));
+              Ret := SystemTags(PChar(cmd), [NP_StackSize, NewStackSize, TAG_END]);
               if Ret <> 0 then
                 ShowMessage(FFileList[FActiveElement].Name + ' returned with error message: ' + IntToStr(Ret));
               // wait a bit and remove message
